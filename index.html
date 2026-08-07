@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>iPad Verwaltung – Schule</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="iPad Verwaltung" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- HTML5 QR Code Scanner -->
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+<!-- Importmap für den Lade-Fix in modernen Browsern ohne Server -->
+<script type="importmap">
+  {
+    "imports": {
+      "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime"
+    }
+  }
+</script>
+
+<style>
+  body { margin: 0; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; background-color: #F8FAFC; }
+  /* Signature Pad Styling */
+  .signature-canvas { touch-action: none; border-radius: 0.5rem; background-color: #fff; cursor: crosshair; }
+  /* Hide scrollbar for tabs */
+  .hide-scroll::-webkit-scrollbar { display: none; }
+  .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+  
+  /* Druck-Einstellungen für den Vertrag */
+  @media print {
+    body * {
+      visibility: hidden; /* Versteckt die gesamte App */
+    }
+    #print-contract, #print-contract * {
+      visibility: visible; /* Zeigt NUR den Vertrag an */
+    }
+    #print-contract {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      background: white;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="root">
+  <div style="padding: 60px 24px; text-align: center; color: #64748b;">
+    Anwendung wird geladen...
+  </div>
+</div>
+<script type="text/babel" data-type="module" data-presets="react">
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "https://esm.sh/react@18.3.1";
+import ReactDOM from "https://esm.sh/react-dom@18.3.1/client";
+import * as XLSX from "https://esm.sh/xlsx@0.18.5";
+import {
+  LayoutDashboard, ArrowLeftRight, LifeBuoy, MessageSquare, Tablet, PackageCheck, PackageOpen, 
+  Search, QrCode, CheckCircle2, Circle, Wrench, PenLine, Send, ChevronRight, AlertTriangle, Users, 
+  Clock, X, Filter, Undo2, UserRound, School, Upload, FileSpreadsheet, Download, RotateCcw, 
+  Cloud, CloudOff, Loader2, Settings, ScanLine, Github, ShieldAlert, Save, Printer
+} from "https://esm.sh/lucide-react@0.383.0?deps=react@18.3.1";
+
+/* ------------------------------------------------------------------ */
+/* 1. MOCK DATA & CONFIG                                              */
+/* ------------------------------------------------------------------ */
+
+const INITIAL_IPADS = [
+  { id: "iPad-001", assetTag: "SN-24-001", status: "available", holder: null, class: null, returnDate: null, condition: "Gut" },
+  { id: "iPad-002", assetTag: "SN-24-002", status: "lent", holder: "Anna Schmidt (Schüler:in)", class: "7b", returnDate: "2026-07-14", condition: "Gut" },
+  { id: "iPad-003", assetTag: "SN-24-003", status: "repair", holder: null, class: null, returnDate: null, condition: "Display gebrochen" },
+];
+const INITIAL_TICKETS = [
+  { id: 1, ipadId: "iPad-003", reporter: "Max Müller (9a)", issue: "Display ist gesprungen.", status: "open", date: "05.07.2026" }
+];
+const INITIAL_ACTIVITIES = [
+  { id: 1, type: "system", text: "System initialisiert", time: "gerade eben" }
+];
+
+/* ------------------------------------------------------------------ */
+/* 2. REUSABLE COMPONENTS (Signature, QR, Badges)                     */
+/* ------------------------------------------------------------------ */
+
+function SignaturePad({ onSign }) {
+  const canvasRef = useRef(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [hasSignature, setHasSignature] = useState(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = 150;
+      const ctx = canvas.getContext('2d');
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#1e293b';
+    }
+  }, []);
+
+  const startDraw = (e) => {
+    const ctx = canvasRef.current.getContext('2d');
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = (e.clientX || e.touches?.[0].clientX) - rect.left;
+    const y = (e.clientY || e.touches?.[0].clientY) - rect.top;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    setIsDrawing(true);
+  };
+
+  const draw = (e) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const ctx = canvasRef.current.getContext('2d');
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = (e.clientX || e.touches?.[0].clientX) - rect.left;
+    const y = (e.clientY || e.touches?.[0].clientY) - rect.top;
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    setHasSignature(true);
+  };
+
+  const stopDraw = () => {
+    setIsDrawing(false);
+    if (hasSignature && onSign) onSign(canvasRef.current.toDataURL());
+  };
+
+  const clear = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasSignature(false);
+    if (onSign) onSign(null);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="relative border-2 border-dashed border-slate-300 rounded-xl overflow-hidden bg-slate-50">
+        <canvas
+          ref={canvasRef}
+          className="w-full signature-canvas"
+          onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+          onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
+        />
+        {!hasSignature && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
+            <p className="flex items-center gap-2"><PenLine size={18}/> Hier unterschreiben</p>
+          </div>
+        )}
+      </div>
+      {hasSignature && (
+        <button type="button" onClick={clear} className="text-xs text-rose-600 hover:underline">
+          Unterschrift löschen
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ScannerModal({ onClose, onScan }) {
+  useEffect(() => {
+    let scanner = new window.Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+    scanner.render((text) => {
+      onScan(text);
+      scanner.clear();
+      onClose();
+    }, (err) => { /* ignore */ });
+    return () => { scanner.clear().catch(()=>{}); };
+  }, [onScan, onClose]);
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative">
+        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+          <h3 className="font-bold flex items-center gap-2"><ScanLine size={18}/> QR-Code scannen</h3>
+          <button onClick={onClose} className="p-1 rounded-md bg-slate-200 hover:bg-slate-300 text-slate-700"><X size={18}/></button>
+        </div>
+        <div id="reader" className="w-full"></div>
+      </div>
+    </div>
+  );
+}
+
+const STATUS_STYLE = {
+  available: { label: "Verfügbar", dot: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50", ring: "ring-emerald-200" },
+  lent: { label: "Verliehen", dot: "bg-indigo-500", text: "text-indigo-700", bg: "bg-indigo-50", ring: "ring-indigo-200" },
+  repair: { label: "Reparatur", dot: "bg-rose-500", text: "text-rose-700", bg: "bg-rose-50", ring: "ring-rose-200" },
+};
+
+function StatusBadge({ status }) {
+  const s = STATUS_STYLE[status] || STATUS_STYLE.available;
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${s.bg} ${s.text} ${s.ring}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />{s.label}
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 3. MAIN APPLICATION & STATE                                        */
+/* ------------------------------------------------------------------ */
+
+function App() {
+  const [tab, setTab] = useState("dashboard");
+  const [ipads, setIpads] = useState(INITIAL_IPADS);
+  const [tickets, setTickets] = useState(INITIAL_TICKETS);
+  const [activities, setActivities] = useState(INITIAL_ACTIVITIES);
+  
+  // Settings / Supabase
+  const [supaConfig, setSupaConfig] = useState(() => JSON.parse(localStorage.getItem("supa_config") || '{"url":"","key":""}'));
+  const [syncStatus, setSyncStatus] = useState("local");
+  const [showScanner, setShowScanner] = useState(false);
+
+  const addActivity = (type, text) => {
+    setActivities(prev => [{ id: Date.now(), type, text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }, ...prev]);
+  };
+
+  // State Persistence (LocalStorage fallback / Supabase)
+  useEffect(() => {
+    const saveState = async () => {
+      const stateObj = { ipads, tickets, activities };
+      if (!supaConfig.url || !supaConfig.key) {
+        localStorage.setItem("ipad_state", JSON.stringify(stateObj));
+        setSyncStatus("local");
+        return;
+      }
+      setSyncStatus("saving");
+      try {
+        const res = await fetch(`${supaConfig.url}/rest/v1/app_data`, {
+          method: "POST",
+          headers: { apikey: supaConfig.key, Authorization: `Bearer ${supaConfig.key}`, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates" },
+          body: JSON.stringify([{ id: "main", data: stateObj, updated_at: new Date().toISOString() }])
+        });
+        if(res.ok) setSyncStatus("synced"); else throw new Error();
+      } catch {
+        setSyncStatus("error");
+        localStorage.setItem("ipad_state", JSON.stringify(stateObj)); // Fallback
+      }
+    };
+    const timer = setTimeout(saveState, 1000);
+    return () => clearTimeout(timer);
+  }, [ipads, tickets, activities, supaConfig]);
+
+  // Handle Express Scan
+  const handleScan = (code) => {
+    const device = ipads.find(i => i.id === code || i.assetTag === code);
+    if (!device) {
+      alert(`Unbekanntes Gerät gescannt: ${code}`);
+      return;
+    }
+    if (device.status === "lent") {
+      // Auto Check-In
+      setIpads(prev => prev.map(i => i.id === device.id ? { ...i, status: "available", holder: null, class: null, returnDate: null } : i));
+      addActivity("checkin", `${device.id} von ${device.holder} zurückgenommen`);
+      alert(`${device.id} erfolgreich zurückgenommen!`);
+    } else if (device.status === "available") {
+      // Auto Check-Out setup
+      setTab("lending");
+      const person = prompt(`Gerät ${device.id} ausgeben an (Name):`);
+      if(person) {
+        setIpads(prev => prev.map(i => i.id === device.id ? { ...i, status: "lent", holder: person, returnDate: new Date().toLocaleDateString()} : i));
+        addActivity("checkout", `${device.id} an ${person} ausgegeben.`);
+      }
+    } else {
+      alert(`Gerät ${device.id} ist aktuell im Status: ${STATUS_STYLE[device.status].label}`);
+    }
+  };
+
+  const navItems = [
+    { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { key: "lending", label: "Ausleihe", icon: ArrowLeftRight },
+    { key: "support", label: "Support", icon: LifeBuoy },
+    { key: "settings", label: "Einstellungen", icon: Settings },
+  ];
+
+  return (
+    <div className="min-h-screen flex flex-col md:flex-row text-slate-800">
+      {/* SIDEBAR (Desktop) */}
+      <aside className="hidden md:flex w-64 flex-col bg-white border-r border-slate-200 shrink-0 shadow-[4px_0_24px_rgba(0,0,0,0.02)] relative z-10">
+        <div className="p-5 border-b border-slate-100 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-indigo-200 shadow-lg text-white">
+            <Tablet size={20} />
+          </div>
+          <div>
+            <h1 className="font-bold text-base leading-tight">iPad Admin</h1>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Schul-Version</span>
+          </div>
+        </div>
+        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+          <span className="text-xs font-medium text-slate-500">System Status</span>
+          <span className={`flex items-center gap-1.5 text-[11px] font-bold px-2 py-1 rounded-full 
+            ${syncStatus==='synced'?'bg-emerald-100 text-emerald-700':syncStatus==='local'?'bg-slate-200 text-slate-600':syncStatus==='saving'?'bg-indigo-100 text-indigo-700':'bg-rose-100 text-rose-700'}`}>
+            {syncStatus==='synced'&&<Cloud size={12}/>}{syncStatus==='local'&&<Save size={12}/>}{syncStatus==='error'&&<CloudOff size={12}/>}{syncStatus==='saving'&&<Loader2 size={12} className="animate-spin"/>}
+            {syncStatus.toUpperCase()}
+          </span>
+        </div>
+        <nav className="flex-1 p-3 space-y-1">
+          {navItems.map(n => (
+            <button key={n.key} onClick={() => setTab(n.key)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${tab === n.key ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
+              <n.icon size={18} className={tab===n.key?'text-indigo-600':'text-slate-400'}/> {n.label}
+            </button>
+          ))}
+        </nav>
+        <div className="p-4 m-4 bg-slate-50 rounded-2xl border border-slate-200/60">
+          <button onClick={() => setShowScanner(true)} className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold hover:bg-indigo-700 shadow-sm transition-transform active:scale-95">
+            <ScanLine size={18} /> Express-Scan
+          </button>
+        </div>
+      </aside>
+
+      {/* MOBILE HEADER */}
+      <header className="md:hidden bg-white border-b border-slate-200 p-4 flex justify-between items-center sticky top-0 z-20">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white"><Tablet size={16}/></div>
+          <h1 className="font-bold text-slate-900">iPad Admin</h1>
+        </div>
+        <button onClick={() => setShowScanner(true)} className="bg-indigo-100 text-indigo-700 p-2 rounded-lg"><ScanLine size={20}/></button>
+      </header>
+
+      {/* MAIN CONTENT */}
+      <main className="flex-1 overflow-y-auto pb-24 md:pb-6 p-4 md:p-8 bg-slate-50">
+        {tab === "dashboard" && <Dashboard ipads={ipads} tickets={tickets} activities={activities} goTo={setTab} />}
+        {tab === "lending" && <Lending ipads={ipads} setIpads={setIpads} addActivity={addActivity} />}
+        {tab === "support" && <Support tickets={tickets} setTickets={setTickets} ipads={ipads} />}
+        {tab === "settings" && <SettingsView config={supaConfig} setConfig={setSupaConfig} />}
+      </main>
+
+      {/* MOBILE NAV */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 flex justify-around p-2 z-20 pb-safe">
+        {navItems.map(n => (
+          <button key={n.key} onClick={() => setTab(n.key)} className={`flex flex-col items-center p-2 rounded-lg text-[10px] font-semibold transition-colors ${tab === n.key ? 'text-indigo-600' : 'text-slate-400'}`}>
+            <n.icon size={20} className="mb-1" /> {n.label}
+          </button>
+        ))}
+      </nav>
+
+      {showScanner && <ScannerModal onClose={() => setShowScanner(false)} onScan={handleScan} />}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* VIEWS / MODULES                                                    */
+/* ------------------------------------------------------------------ */
+
+function Dashboard({ ipads, tickets, activities, goTo }) {
+  const lent = ipads.filter(i => i.status === "lent").length;
+  const avail = ipads.filter(i => i.status === "available").length;
+  const rep = ipads.filter(i => i.status === "repair").length;
+  const openT = tickets.filter(t => t.status === "open").length;
+
+  const Stat = ({ label, val, icon:Icon, bg, text }) => (
+    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+      <div className={`h-12 w-12 rounded-full flex items-center justify-center ${bg} ${text}`}><Icon size={24}/></div>
+      <div>
+        <p className="text-3xl font-black text-slate-800">{val}</p>
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6">
+      <h2 className="text-2xl font-bold">Übersicht</h2>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Stat label="Verliehen" val={lent} icon={ArrowLeftRight} bg="bg-indigo-50" text="text-indigo-600" />
+        <Stat label="Auf Lager" val={avail} icon={PackageCheck} bg="bg-emerald-50" text="text-emerald-600" />
+        <Stat label="Reparatur" val={rep} icon={Wrench} bg="bg-rose-50" text="text-rose-600" />
+        <Stat label="Tickets" val={openT} icon={LifeBuoy} bg="bg-amber-50" text="text-amber-600" />
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 space-y-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="font-bold mb-4 flex items-center gap-2"><ArrowLeftRight size={18}/> Schnellzugriff</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <button onClick={()=>goTo("lending")} className="p-6 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 text-left transition-colors">
+                <PackageOpen size={24} className="text-indigo-600 mb-2"/>
+                <p className="font-bold">Gerät Ausgeben</p>
+                <p className="text-xs text-slate-500 mt-1">Ausleihe an Schüler/Lehrer</p>
+              </button>
+              <button onClick={()=>goTo("lending")} className="p-6 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 text-left transition-colors">
+                <Undo2 size={24} className="text-emerald-600 mb-2"/>
+                <p className="font-bold">Rücknahme</p>
+                <p className="text-xs text-slate-500 mt-1">Ins Lager zurückbuchen</p>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+          <h3 className="font-bold mb-4 flex items-center gap-2"><Clock size={18}/> Aktivitäten</h3>
+          <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
+            {activities.slice(0,6).map(a => (
+              <div key={a.id} className="flex gap-3 text-sm border-b border-slate-50 pb-3 last:border-0">
+                <div className="mt-1 h-2 w-2 rounded-full bg-slate-300 shrink-0"/>
+                <div>
+                  <p className="text-slate-700 font-medium">{a.text}</p>
+                  <p className="text-[11px] text-slate-400">{a.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Lending({ ipads, setIpads, addActivity }) {
+  const [mode, setMode] = useState("inventory");
+  
+  // Checkout State
+  const [coId, setCoId] = useState("");
+  const [coPerson, setCoPerson] = useState("");
+  const [coRole, setCoRole] = useState("Schüler:in"); 
+  const [coSig, setCoSig] = useState(null);
+  
+  const handleCheckout = (e) => {
+    e.preventDefault();
+    if(!coId || !coPerson) return;
+    const device = ipads.find(i => i.id === coId);
+    if(device?.status !== "available") return alert("Gerät nicht verfügbar.");
+    
+    // Die Rolle wird mit in den Inhaber-Text gespeichert
+    const holderText = `${coPerson} (${coRole})`;
+    
+    setIpads(prev => prev.map(i => i.id === coId ? {...i, status: "lent", holder: holderText, returnDate: new Date().toLocaleDateString()} : i));
+    addActivity("checkout", `${coId} an ${holderText} verliehen`);
+    setCoId(""); setCoPerson(""); setCoRole("Schüler:in"); setCoSig(null);
+    alert("Erfolgreich ausgegeben!");
+  };
+
+  const handlePrint = () => {
+    if (!coId || !coPerson) {
+      alert("Bitte gib zuerst die Geräte-ID und den Namen ein, um den Vertrag zu generieren.");
+      return;
+    }
+    window.print();
+  };
+
+  const exportExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(ipads);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Inventar");
+    XLSX.writeFile(wb, "iPad_Inventar.xlsx");
+  };
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6 relative">
+      <div className="flex gap-2 p-1.5 bg-slate-200 rounded-xl w-fit overflow-x-auto hide-scroll">
+        {[
+          {id: 'inventory', label: 'Inventar & Export', icon: Tablet},
+          {id: 'checkout', label: 'Ausgabe (Leihvertrag)', icon: PackageOpen},
+          {id: 'checkin', label: 'Rücknahme', icon: Undo2},
+        ].map(t => (
+          <button key={t.id} onClick={()=>setMode(t.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${mode===t.id ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600'}`}>
+            <t.icon size={16}/> {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 min-h-[400px]">
+        
+        {/* --- INVENTAR --- */}
+        {mode === "inventory" && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold text-lg">Gerätebestand</h3>
+              <button onClick={exportExcel} className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-lg text-sm font-bold border border-emerald-200 hover:bg-emerald-100">
+                <Download size={16}/> Excel Export
+              </button>
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
+                  <tr><th className="px-4 py-3">ID / Tag</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Inhaber</th><th className="px-4 py-3">Zustand</th></tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {ipads.map(i => (
+                    <tr key={i.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-semibold">{i.id} <br/><span className="text-xs text-slate-400 font-normal">{i.assetTag}</span></td>
+                      <td className="px-4 py-3"><StatusBadge status={i.status}/></td>
+                      <td className="px-4 py-3">{i.holder || '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{i.condition}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* --- AUSGABE / CHECKOUT --- */}
+        {mode === "checkout" && (
+          <div className="max-w-md mx-auto space-y-6">
+            <div className="text-center mb-6">
+              <h3 className="font-bold text-xl">Neuer Leihvertrag</h3>
+              <p className="text-sm text-slate-500">Gerät ausgeben & digital unterschreiben</p>
+            </div>
+            
+            <form onSubmit={handleCheckout} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold mb-1">Geräte ID</label>
+                <input value={coId} onChange={e=>setCoId(e.target.value)} list="avail-list" className="w-full border border-slate-300 rounded-xl px-4 py-2.5 bg-slate-50" placeholder="z.B. iPad-001" required/>
+                <datalist id="avail-list">{ipads.filter(i=>i.status==='available').map(i=><option key={i.id} value={i.id}/>)}</datalist>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold mb-1">Person / Rolle</label>
+                <div className="flex gap-4 mb-2 p-2 bg-slate-50 rounded-xl border border-slate-200">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="radio" value="Schüler:in" checked={coRole === "Schüler:in"} onChange={e=>setCoRole(e.target.value)} className="accent-indigo-600 w-4 h-4" /> Schüler:in
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="radio" value="Lehrkraft" checked={coRole === "Lehrkraft"} onChange={e=>setCoRole(e.target.value)} className="accent-indigo-600 w-4 h-4" /> Lehrkraft
+                  </label>
+                </div>
+                <input value={coPerson} onChange={e=>setCoPerson(e.target.value)} className="w-full border border-slate-300 rounded-xl px-4 py-2.5 bg-slate-50" placeholder="Vor- und Nachname..." required/>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">Digitale Unterschrift</label>
+                <SignaturePad onSign={setCoSig}/>
+              </div>
+              
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={handlePrint} className="flex-1 bg-slate-100 text-slate-700 rounded-xl py-3 font-bold hover:bg-slate-200 border border-slate-300 transition-colors flex justify-center items-center gap-2">
+                  <Printer size={18}/> Drucken
+                </button>
+                <button type="submit" disabled={!coSig} className="flex-[2] bg-indigo-600 text-white rounded-xl py-3 font-bold hover:bg-indigo-700 disabled:bg-slate-300 transition-colors flex justify-center items-center gap-2">
+                  <CheckCircle2 size={18}/> Bestätigen
+                </button>
+              </div>
+            </form>
+
+            {/* Versteckter Vertrag (Wird nur beim Drucken sichtbar) */}
+            <div id="print-contract" className="hidden">
+              <div className="p-8 font-serif text-black max-w-3xl mx-auto">
+                <h1 className="text-3xl font-bold text-center mb-8 border-b-2 border-black pb-4">Nutzungsvereinbarung & Leihvertrag</h1>
+                
+                <p className="mb-6 leading-relaxed">
+                  Zwischen der Schule und der untenstehenden Person wird heute, am <strong>{new Date().toLocaleDateString()}</strong>, ein Leihvertrag über ein schulisches Endgerät geschlossen.
+                </p>
+
+                <div className="bg-gray-100 p-6 rounded-lg mb-8 border border-gray-300">
+                  <table className="w-full text-left">
+                    <tbody>
+                      <tr><th className="py-2 w-1/3">Geräte-ID (iPad):</th><td className="py-2 font-bold">{coId || "___________________"}</td></tr>
+                      <tr><th className="py-2 w-1/3">Ausgegeben an:</th><td className="py-2">{coPerson || "___________________"}</td></tr>
+                      <tr><th className="py-2 w-1/3">Rolle:</th><td className="py-2">{coRole}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <h3 className="font-bold text-lg mb-3">Nutzungsbedingungen</h3>
+                <ul className="list-disc pl-6 space-y-3 mb-12">
+                  <li>Das Leihgerät bleibt Eigentum der Schule und ist äußerst pfleglich zu behandeln.</li>
+                  <li>Das Gerät darf ausschließlich für schulische und unterrichtliche Zwecke genutzt werden.</li>
+                  <li>Die Installation privater, nicht schulischer Software ist untersagt.</li>
+                  <li>Der Verlust oder jegliche Beschädigung (z.B. Displaybruch) ist der IT-Administration oder Schulleitung <strong>unverzüglich</strong> zu melden.</li>
+                  <li>Die mitgelieferte Schutzhülle darf nicht entfernt werden. Eigenmächtige Reparaturversuche sind strengstens verboten.</li>
+                  <li>Das Gerät ist nach Ablauf der vereinbarten Nutzungsdauer oder auf Verlangen der Schule samt Zubehör in ordnungsgemäßem Zustand zurückzugeben.</li>
+                </ul>
+
+                <div className="flex justify-between items-end mt-16 pt-8 border-t border-gray-300">
+                  <div className="text-center">
+                    <p className="mb-2 text-gray-500 text-sm">Datum</p>
+                    <p className="font-bold">{new Date().toLocaleDateString()}</p>
+                  </div>
+                  
+                  <div className="text-center w-64">
+                    <p className="mb-2 text-gray-500 text-sm">Unterschrift {coRole}</p>
+                    {coSig ? (
+                      <img src={coSig} alt="Unterschrift" className="h-16 mx-auto" />
+                    ) : (
+                      <div className="h-16 border-b border-black w-full mb-2"></div>
+                    )}
+                    <p className="text-xs text-gray-500 mt-2">(Digital gezeichnet via App)</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- RÜCKNAHME --- */}
+        {mode === "checkin" && (
+          <div className="max-w-md mx-auto space-y-6 text-center pt-8">
+            <Undo2 size={48} className="mx-auto text-emerald-600 mb-4 opacity-50"/>
+            <h3 className="font-bold text-xl">Schnelle Rücknahme</h3>
+            <p className="text-sm text-slate-500 mb-6">Nutze am besten den Express-Scan Button im Menü, um Geräte sofort in der Datenbank zurückzubuchen und den Zustand zu checken.</p>
+            <p className="text-xs bg-slate-100 p-4 rounded-xl">Tipp: Beim Scannen eines verliehenen Geräts wird dieses automatisch zurückgebucht.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Support({ tickets, setTickets, ipads }) {
+  // Simple Kanban
+  const cols = [
+    {id: 'open', title: 'Offen', color: 'bg-rose-50 text-rose-700 border-rose-200'},
+    {id: 'progress', title: 'Bearbeitung', color: 'bg-amber-50 text-amber-700 border-amber-200'},
+    {id: 'resolved', title: 'Gelöst', color: 'bg-emerald-50 text-emerald-700 border-emerald-200'}
+  ];
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6">
+      <h2 className="text-2xl font-bold">Support & Tickets</h2>
+      <div className="grid md:grid-cols-3 gap-4">
+        {cols.map(c => (
+          <div key={c.id} className="bg-slate-100/50 rounded-2xl p-4 border border-slate-200 min-h-[400px]">
+            <div className={`px-3 py-1.5 rounded-lg text-xs font-bold border mb-4 ${c.color}`}>{c.title}</div>
+            <div className="space-y-3">
+              {tickets.filter(t => (t.status === c.id) || (c.id==='open' && t.status!=='resolved' && t.status!=='progress')).map(t => (
+                <div key={t.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-bold text-sm">{t.ipadId}</span>
+                    <span className="text-[10px] text-slate-400">{t.date}</span>
+                  </div>
+                  <p className="text-sm text-slate-600 mb-3">{t.issue}</p>
+                  <p className="text-xs text-slate-400 font-medium">Melder: {t.reporter}</p>
+                </div>
+              ))}
+              {tickets.filter(t => t.status === c.id || (c.id==='open' && t.status!=='resolved' && t.status!=='progress')).length === 0 && (
+                <p className="text-xs text-slate-400 text-center py-8">Keine Tickets</p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SettingsView({ config, setConfig }) {
+  const [url, setUrl] = useState(config.url || "");
+  const [key, setKey] = useState(config.key || "");
+
+  const save = (e) => {
+    e.preventDefault();
+    const newConf = { url, key };
+    setConfig(newConf);
+    localStorage.setItem("supa_config", JSON.stringify(newConf));
+    alert("Einstellungen gespeichert!");
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <h2 className="text-2xl font-bold">System Einstellungen</h2>
+      
+      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+        <h3 className="font-bold flex items-center gap-2 mb-2"><Cloud size={18} className="text-indigo-600"/> Supabase Cloud-Sync</h3>
+        <p className="text-sm text-slate-500 mb-6">Trage hier deine Supabase-Keys ein, um die Daten sicher in der Cloud statt nur in deinem Browser (localStorage) zu speichern. Die Keys werden nur lokal im Browser gesichert.</p>
+        
+        <form onSubmit={save} className="space-y-4 max-w-md">
+          <div>
+            <label className="text-xs font-bold text-slate-700 block mb-1">Project URL</label>
+            <input value={url} onChange={e=>setUrl(e.target.value)} type="url" placeholder="https://xyz.supabase.co" className="w-full border border-slate-300 rounded-xl px-4 py-2.5 bg-slate-50"/>
+          </div>
+          <div>
+            <label className="text-xs font-bold text-slate-700 block mb-1">Anon Public Key</label>
+            <input value={key} onChange={e=>setKey(e.target.value)} type="password" placeholder="eyJh..." className="w-full border border-slate-300 rounded-xl px-4 py-2.5 bg-slate-50"/>
+          </div>
+          <button type="submit" className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors">Speichern</button>
+        </form>
+      </div>
+
+      <div className="bg-slate-900 text-slate-300 rounded-2xl p-6 shadow-sm">
+        <h3 className="font-bold text-white flex items-center gap-2 mb-2"><Github size={18}/> GitHub Pages Hosting Anleitung</h3>
+        <p className="text-sm mb-4">Diese App wurde speziell dafür entwickelt, kostenlos und ohne Server auf GitHub Pages gehostet zu werden.</p>
+        <ol className="list-decimal pl-5 space-y-2 text-sm">
+          <li>Erstelle ein neues, öffentliches Repository auf GitHub.</li>
+          <li>Lade diese <code className="bg-slate-800 px-1 rounded">index.html</code> Datei dort hoch.</li>
+          <li>Gehe in die Repository <strong>Settings</strong> &gt; <strong>Pages</strong>.</li>
+          <li>Wähle unter "Build and deployment" die <strong>main</strong> Branch aus und speichere.</li>
+          <li>Nach ca. 1-2 Minuten ist deine App unter <code className="text-indigo-300">https://deinname.github.io/repo/</code> erreichbar!</li>
+        </ol>
+        <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex gap-3 text-amber-200 text-xs">
+          <ShieldAlert size={24} className="shrink-0"/>
+          <p>Wichtig: Lade niemals deine Supabase-Keys im HTML-Code hoch. Gib sie stattdessen immer hier im Einstellungs-Menü ein, sobald du die GitHub-Pages-URL aufgerufen hast.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>
