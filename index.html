@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KGS Bad Münder - iPad Ausleih-Verwaltung</title>
+  
+  <!-- html2pdf.js für PDF-Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    :root {
+      --primary: #1b365d;
+      --primary-hover: #2c5282;
+      --bg-light: #f8fafc;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+      --text: #1a202c;
+      --text-muted: #718096;
+      --success: #38a169;
+      --warning: #dd6b20;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #edf2f7;
+      color: var(--text);
+    }
+
+    /* Top Navigation Bar */
+    header {
+      background-color: var(--primary);
+      color: white;
+      padding: 15px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    nav {
+      display: flex;
+      gap: 10px;
+    }
+
+    /* Common App Structure */
+    main {
+      max-width: 1100px;
+      margin: 25px auto;
+      padding: 0 20px;
+    }
+
+    .page {
+      display: none;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 8px;
+      padding: 25px;
+      margin-bottom: 25px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    /* Buttons */
+    .btn {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: background-color 0.2s;
+    }
+
+    .btn:hover { background-color: var(--primary-hover); }
+    .btn-secondary { background-color: #718096; }
+    .btn-secondary:hover { background-color: #4a5568; }
+    .btn-outline { background: transparent; border: 1px solid white; color: white; }
+    .btn-outline:hover { background: rgba(255,255,255,0.15); }
+
+    .nav-bar-bottom {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 25px;
+      padding-top: 15px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* Dashboard Widgets */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      margin-bottom: 25px;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      border-left: 4px solid var(--primary);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .stat-card .value {
+      font-size: 28px;
+      font-weight: bold;
+      color: var(--primary);
+    }
+
+    .stat-card .label {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* Forms */
+    .form-group { margin-bottom: 15px; }
+    .form-row { display: flex; gap: 15px; }
+    .form-row .form-group { flex: 1; }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: bold;
+      font-size: 13px;
+    }
+
+    input[type="text"], input[type="date"], select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-size: 14px;
+    }
+
+    .checkbox-group {
+      display: flex;
+      gap: 20px;
+      margin-top: 8px;
+    }
+
+    .checkbox-group label { font-weight: normal; cursor: pointer; }
+
+    canvas {
+      border: 1px dashed var(--border);
+      border-radius: 5px;
+      background: #fafafa;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+
+    th {
+      background-color: var(--bg-light);
+      color: var(--primary);
+    }
+
+    .badge {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .badge-success { background: #c6f6d5; color: #22543d; }
+    .badge-warning { background: #feebc8; color: #744210; }
+
+    /* Modal/Preview */
+    .contract-preview {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #000;
+      background: white;
+      padding: 30px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+
+    .contract-preview h2 { text-align: center; font-size: 18px; color: black; }
+    .contract-preview h3 { font-size: 14px; margin-top: 18px; border-bottom: 1px solid #ddd; }
+    .contract-field { font-weight: bold; text-decoration: underline; }
+    .signature-img { max-height: 50px; vertical-align: bottom; }
+
+    /* Print styles */
+    @media print {
+      header, nav, .btn, .nav-bar-bottom, .no-print { display: none !important; }
+      body { background: white; margin: 0; }
+      main { max-width: 100%; margin: 0; padding: 0; }
+      .page { display: block !important; }
+      #dashboardPage, #formPage { display: none !important; }
+      .contract-preview { border: none; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- App Header & Main Navigation -->
+  <header>
+    <h1>KGS Bad Münder | iPad-Ausleihe</h1>
+    <nav class="no-print">
+      <button class="btn btn-outline" onclick="showPage('dashboardPage')"> Dashboard</button>
+      <button class="btn btn-outline" onclick="showPage('formPage')">+ Neue Ausleihe</button>
+    </nav>
+  </header>
+
+  <main>
+    
+    <!-- EBENE 1: DASHBOARD / ÜBERSICHT -->
+    <div id="dashboardPage" class="page active">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="value">142</div>
+          <div class="label">Aktive Leihverträge</div>
+        </div>
+        <div class="stat-card" style="border-left-color: var(--success);">
+          <div class="value">38</div>
+          <div class="label">Verfügbare iPads</div>
+        </div>
+        <div class="stat-card" style="border-left-color: var(--warning);">
+          <div class="value">4</div>
+          <div class="label">Rückgaben ausstehend</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+          <h2 style="margin: 0; font-size: 18px;">Aktuelle Ausleihen</h2>
+          <button class="btn" onclick="showPage('formPage')">+ Neue Ausleihe starten</button>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Schüler/in</th>
+              <th>Klasse</th>
+              <th>Verleih-Nr.</th>
+              <th>Gerät (S/N)</th>
+              <th>Ausgabedatum</th>
+              <th>Status</th>
+              <th>Aktion</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Max Mustermann</td>
+              <td>8b</td>
+              <td>V-2026-012</td>
+              <td>DMP123456789</td>
+              <td>01.08.2026</td>
+              <td><span class="badge badge-success">Aktiv</span></td>
+              <td><button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="demoPreview('Max Mustermann', '8b', 'V-2026-012', 'DMP123456789')">Anzeigen</button></td>
+            </tr>
+            <tr>
+              <td>Laura Schmidt</td>
+              <td>10a</td>
+              <td>V-2026-015</td>
+              <td>DMP987654321</td>
+              <td>03.08.2026</td>
+              <td><span class="badge badge-success">Aktiv</span></td>
+              <td><button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="demoPreview('Laura Schmidt', '10a', 'V-2026-015', 'DMP987654321')">Anzeigen</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- EBENE 2: FORMULAR (AUSLEIHPROZESS) -->
+    <div id="formPage" class="page">
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 20px;">
+          <h2 style="margin: 0; font-size: 18px;">Neue Ausleihe anlegen</h2>
+          <button class="btn btn-secondary" onclick="showPage('dashboardPage')"> Abbrechen / Zum Dashboard</button>
+        </div>
+
+        <form id="loanForm">
+          <h3 style="font-size: 15px; color: var(--primary);">1. Angaben zum Entleiher (Schüler/in)</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="schuelerName">Name, Vorname:</label>
+              <input type="text" id="schuelerName" placeholder="z. B. Max Mustermann" required>
+            </div>
+            <div class="form-group">
+              <label for="klasse">Klasse / Jahrgang:</label>
+              <input type="text" id="klasse" placeholder="z. B. 8b" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="adresse">Anschrift (Straße, PLZ, Ort):</label>
+            <input type="text" id="adresse" placeholder="z. B. Musterstraße 1, 31848 Bad Münder" required>
+          </div>
+
+          <div class="form-group">
+            <label for="elternName">Name der/des Erziehungsberechtigten:</label>
+            <input type="text" id="elternName" placeholder="z. B. Erika Mustermann" required>
+          </div>
+
+          <h3 style="font-size: 15px; color: var(--primary); margin-top: 25px;">2. Geräte-Details</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="verleihNr">Verleihnummer:</label>
+              <input type="text" id="verleihNr" placeholder="z. B. V-2026-020" required>
+            </div>
+            <div class="form-group">
+              <label for="snIpad">Seriennummer iPad:</label>
+              <input type="text" id="snIpad" placeholder="z. B. DMP555666777" required>
+            </div>
+            <div class="form-group">
+              <label for="snTastatur">Seriennummer Tastatur:</label>
+              <input type="text" id="snTastatur" placeholder="z. B. KBD111222333">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Zubehör:</label>
+            <div class="checkbox-group">
+              <label><input type="checkbox" id="zubLadekabel" checked> Ladegerät + Kabel</label>
+              <label><input type="checkbox" id="zubTastatur" checked> Tastatur</label>
+              <label><input type="checkbox" id="zubStift"> Eingabestift</label>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="ausgabeDatum">Ausgabedatum:</label>
+              <input type="date" id="ausgabeDatum" required>
+            </div>
+            <div class="form-group">
+              <label for="leihEndeTyp">Leihdauer:</label>
+              <select id="leihEndeTyp">
+                <option value="schuljahr">Schuljahresende</option>
+                <option value="festeDatum">Festes Datum</option>
+              </select>
+            </div>
+          </div>
+
+          <h3 style="font-size: 15px; color: var(--primary); margin-top: 25px;">3. Digitale Unterschrift</h3>
+          <div class="form-group">
+            <label>Unterschrift Erziehungsberechtigte/r:</label>
+            <canvas id="sigCanvas" width="500" height="120"></canvas>
+            <div>
+              <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; margin-top: 5px;" onclick="clearCanvas()">Unterschrift zurücksetzen</button>
+            </div>
+          </div>
+
+          <div class="nav-bar-bottom">
+            <button type="button" class="btn btn-secondary" onclick="showPage('dashboardPage')"> Zurück</button>
+            <button type="button" class="btn" onclick="buildAndShowPreview()">Vertragsvoransicht öffnen </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- EBENE 3: VERTRAGSVORANSICHT (FULLTEXT) -->
+    <div id="previewPage" class="page">
+      <div class="card no-print">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <button class="btn btn-secondary" onclick="showPage('formPage')"> Bearbeiten / Zurück zum Formular</button>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn" onclick="savePDF()"> Als PDF Speichern</button>
+            <button class="btn" onclick="window.print()"> Drucken</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="contractRender" class="contract-preview">
+        <h2>Leihvertrag über die Leihe eines mobilen Endgeräts<br>für Schülerinnen und Schüler</h2>
+        <p style="text-align: center;"><strong>Zwischen</strong><br>
+        der <strong>Kooperativen Gesamtschule Bad Münder (KGS Bad Münder)</strong><br>
+        Bahnhofstraße 52, 31848 Bad Münder, vertreten durch die Schulleitung<br>
+        <em>- im Folgenden Verleiher -</em></p>
+
+        <p style="text-align: center;"><strong>und</strong><br>
+        <span class="contract-field" id="p_schuelerName"></span>, <span class="contract-field" id="p_adresse"></span><br>
+        Schule und Jahrgang/Klasse: <span class="contract-field" id="p_klasse"></span><br>
+        vertreten durch: <span class="contract-field" id="p_elternName"></span><br>
+        <em>- im Folgenden Entleiher -</em></p>
+
+        <p>wird folgender Vertrag geschlossen:</p>
+
+        <h3>§ 1 Vertragsgegenstand</h3>
+        <p>(1) Der Verleiher stellt dem Entleiher im Schuljahr das im Folgenden näher bezeichnete mobile Endgerät und etwaiges Zubehör (im Folgenden: Leihobjekt) zur Verfügung:</p>
+        <ul>
+          <li><strong>Verleihnummer:</strong> <span class="contract-field" id="p_verleihNr"></span></li>
+          <li><strong>Seriennummer iPad:</strong> <span class="contract-field" id="p_snIpad"></span></li>
+          <li><strong>Seriennummer Tastatur:</strong> <span class="contract-field" id="p_snTastatur"></span></li>
+          <li><strong>Zubehör:</strong> <span id="p_zubehoer"></span></li>
+        </ul>
+        <p>(2) An dem Leihobjekt dürfen durch den Entleiher keine irreversiblen technischen Veränderungen vorgenommen werden.</p>
+        <p>(3) Das Leihobjekt befindet sich in dem aus der Anlage Vorschäden ersichtlichen Zustand.</p>
+
+        <h3>§ 2 Leihdauer</h3>
+        <p>(1) Die Leihzeit beginnt mit der Ausgabe des Leihobjekts am <span class="contract-field" id="p_ausgabeDatum"></span> und endet: <span class="contract-field" id="p_leihEnde"></span>.</p>
+        <p>(2) Verlässt der Entleiher vor dem Ende der Leihzeit die KGS Bad Münder, endet die Leihzeit mit Ablauf des letzten Tages an dieser Schule.</p>
+        <p>(3) Das Leihobjekt ist nach Ablauf unverzüglich zurückzugeben.</p>
+
+        <h3>§ 3 - § 5 Rechte und Verhaltenspflichten</h3>
+        <p><strong>§ 3 Zweckbestimmung:</strong> Nutzung ausschließlich für schulische Zwecke.<br>
+        <strong>§ 4 Geräteverwaltung:</strong> Administration erfolgt zentral durch die Schule (MDM-Profil, Updates, Sperrung/Ortung bei Verlust).<br>
+        <strong>§ 5 Verhaltenspflichten:</strong> Schutz vor Missbrauch. Verbot von rechtswidrigen, verfassungsfeindlichen oder jugendgefährdenden Inhalten.</p>
+
+        <h3>§ 6 - § 10 Datensicherheit & Haftung</h3>
+        <p><strong>§ 6 Datenspeicherung:</strong> Keine lokale Speicherung garantiert. Empfehlung: Nutzung der Niedersächsischen Bildungscloud.<br>
+        <strong>§ 8 Aufbewahrung:</strong> Das Gerät muss stets in der Schutzhülle aufbewahrt werden.<br>
+        <strong>§ 10 Jugendschutz:</strong> Einsatz eines Contentfilters (Freigabe ab 12 Jahre nach § 14 Abs. 2 Nr. 3 JuSchG).<br>
+        <strong>§ 11 Haftung:</strong> Die Entleiher/Erziehungsberechtigten haften für Schäden nach gesetzlichen Vorgaben.</p>
+
+        <h3>§ 12 - § 14 Sonstiges</h3>
+        <p><strong>§ 12 Weitergabe:</strong> Weitergabe an Dritte ist untersagt.<br>
+        <strong>§ 13 Diebstahl:</strong> Verlust/Diebstahl ist unverzüglich zu melden; bei Diebstahl ist Anzeige zu erstatten.<br>
+        <strong>§ 14 Gültigkeit:</strong> Änderungen bedürfen der Schriftform.</p>
+
+        <br>
+        <p>Bad Münder, den <span class="contract-field" id="p_datumAktuell"></span></p>
+
+        <table style="width:100%; margin-top: 30px; text-align: center; border:none;">
+          <tr style="border:none;">
+            <td style="width:50%; vertical-align: bottom; border:none;">
+              <div id="p_sigContainer">
+                <img id="p_sigImage" class="signature-img" src="" alt="Unterschrift">
+              </div>
+              ________________________________________<br>
+              Unterschrift Entleiher / Erziehungsberechtigte(r)
+            </td>
+            <td style="width:50%; vertical-align: bottom; border:none;">
+              <br><br>
+              ________________________________________<br>
+              Für den Verleiher: Schulleitung (mit Stempel)
+            </td>
+          </tr>
+        </table>
+
+        <hr style="margin-top: 30px; border: 0; border-top: 1px solid #ccc;">
+        <h3>Anlage: Vorschäden & Rückgabe</h3>
+        <p>Seriennummer: <span class="contract-field" id="p_snIpadAnlage"></span> | Mängel bei Ausgabe: Keine</p>
+      </div>
+    </div>
+
+  </main>
+
+<script>
+  // Standard-Datumsfeld setzen
+  document.getElementById('ausgabeDatum').valueAsDate = new Date();
+
+  // Navigation zwischen den Ebener/Seiten
+  function showPage(pageId) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(pageId).classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  // Canvas / Unterschriften-Logik
+  const canvas = document.getElementById('sigCanvas');
+  const ctx = canvas.getContext('2d');
+  let isDrawing = false;
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  }
+
+  function startDrawing(e) {
+    isDrawing = true;
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+  }
+
+  function draw(e) {
+    if (!isDrawing) return;
+    const pos = getPos(e);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = "#000080";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  function stopDrawing() { isDrawing = false; }
+
+  canvas.addEventListener('mousedown', startDrawing);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', stopDrawing);
+  canvas.addEventListener('touchstart', (e) => { startDrawing(e); e.preventDefault(); });
+  canvas.addEventListener('touchmove', (e) => { draw(e); e.preventDefault(); });
+  canvas.addEventListener('touchend', stopDrawing);
+
+  function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    return `${parts[2]}.${parts[1]}.${parts[0]}`;
+  }
+
+  // Formular auslesen und Vertragsvorschau aufbauen
+  function buildAndShowPreview() {
+    const name = document.getElementById('schuelerName').value;
+    if (!name) {
+      alert('Bitte geben Sie den Namen des Schülers ein.');
+      return;
+    }
+
+    document.getElementById('p_schuelerName').innerText = name;
+    document.getElementById('p_klasse').innerText = document.getElementById('klasse').value;
+    document.getElementById('p_adresse').innerText = document.getElementById('adresse').value;
+    document.getElementById('p_elternName').innerText = document.getElementById('elternName').value;
+
+    document.getElementById('p_verleihNr').innerText = document.getElementById('verleihNr').value;
+    document.getElementById('p_snIpad').innerText = document.getElementById('snIpad').value;
+    document.getElementById('p_snIpadAnlage').innerText = document.getElementById('snIpad').value;
+    document.getElementById('p_snTastatur').innerText = document.getElementById('snTastatur').value || '—';
+
+    let zub = [];
+    if (document.getElementById('zubLadekabel').checked) zub.push('Ladegerät + Kabel');
+    if (document.getElementById('zubTastatur').checked) zub.push('Tastatur');
+    if (document.getElementById('zubStift').checked) zub.push('Eingabestift');
+    document.getElementById('p_zubehoer').innerText = zub.join(', ');
+
+    document.getElementById('p_ausgabeDatum').innerText = formatDate(document.getElementById('ausgabeDatum').value);
+    document.getElementById('p_datumAktuell').innerText = formatDate(document.getElementById('ausgabeDatum').value);
+    document.getElementById('p_leihEnde').innerText = 'mit dem letzten Schultag des aktuellen Schuljahres';
+
+    // Unterschrift als Bild übertragen
+    document.getElementById('p_sigImage').src = canvas.toDataURL();
+
+    // Wechsel zur Vorschauseite
+    showPage('previewPage');
+  }
+
+  // Demo-Aufruf aus Tabelle
+  function demoPreview(name, klasse, verleihNr, sn) {
+    document.getElementById('schuelerName').value = name;
+    document.getElementById('klasse').value = klasse;
+    document.getElementById('adresse').value = 'Musterstraße 10, 31848 Bad Münder';
+    document.getElementById('elternName').value = 'Erika Mustermann';
+    document.getElementById('verleihNr').value = verleihNr;
+    document.getElementById('snIpad').value = sn;
+    buildAndShowPreview();
+  }
+
+  // PDF-Exportfunktion
+  function savePDF() {
+    const element = document.getElementById('contractRender');
+    const name = document.getElementById('schuelerName').value || 'Vertrag';
+    
+    const opt = {
+      margin:       10,
+      filename:     `Leihvertrag_${name.replace(/\s+/g, '_')}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2 },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).save();
+  }
+</script>
+
+</body>
+</html>
