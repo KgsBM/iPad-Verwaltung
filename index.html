@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ausleihe & Schülerleihvertrag - KGS Bad Münder</title>
+  
+  <!-- html2pdf.js Bibliothek für PDF-Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    :root {
+      --primary-color: #1b365d;
+      --secondary-color: #2c5282;
+      --light-bg: #f7fafc;
+      --border-color: #cbd5e0;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #e2e8f0;
+      color: #2d3748;
+    }
+
+    .container {
+      max-width: 850px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    h1, h2 {
+      color: var(--primary-color);
+    }
+
+    h1 {
+      border-bottom: 2px solid var(--primary-color);
+      padding-bottom: 10px;
+      margin-top: 0;
+      font-size: 24px;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 15px;
+    }
+
+    .form-row .form-group {
+      flex: 1;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    input[type="text"], input[type="date"], select, textarea {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+
+    .checkbox-group {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      margin-top: 5px;
+    }
+
+    .checkbox-group label {
+      font-weight: normal;
+      cursor: pointer;
+    }
+
+    canvas {
+      border: 1px dashed var(--border-color);
+      border-radius: 4px;
+      background: #fafafa;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .btn {
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 15px;
+      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .btn:hover {
+      background-color: var(--secondary-color);
+    }
+
+    .btn-secondary {
+      background-color: #718096;
+    }
+
+    .btn-secondary:hover {
+      background-color: #4a5568;
+    }
+
+    /* Modal / Voransicht Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.6);
+      z-index: 1000;
+      overflow-y: auto;
+    }
+
+    .modal-content {
+      background: white;
+      max-width: 800px;
+      margin: 30px auto;
+      padding: 40px;
+      border-radius: 8px;
+      position: relative;
+    }
+
+    .modal-actions {
+      position: sticky;
+      top: 10px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 10px;
+      border-radius: 4px;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 100;
+    }
+
+    /* Vertraggewebe in Voransicht */
+    .contract-preview {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #000;
+    }
+
+    .contract-preview h2 {
+      text-align: center;
+      font-size: 18px;
+      margin-bottom: 5px;
+    }
+
+    .contract-preview h3 {
+      font-size: 14px;
+      margin-top: 15px;
+      margin-bottom: 5px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .contract-field {
+      font-weight: bold;
+      text-decoration: underline;
+    }
+
+    .signature-img {
+      max-height: 50px;
+      vertical-align: bottom;
+    }
+
+    /* Print styling */
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+      .container, .modal-actions {
+        display: none !important;
+      }
+      .modal {
+        position: static;
+        display: block !important;
+        background: white;
+      }
+      .modal-content {
+        box-shadow: none;
+        padding: 0;
+        margin: 0;
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Geräteausleihe & Schülerleihvertrag</h1>
+  
+  <form id="loanForm">
+    <h2>1. Angaben zum Entleiher (Schüler/in)</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="schuelerName">Name, Vorname des Schülers/der Schülerin:</label>
+        <input type="text" id="schuelerName" required placeholder="z. B. Max Mustermann">
+      </div>
+      <div class="form-group">
+        <label for="klasse">Klasse / Jahrgang:</label>
+        <input type="text" id="klasse" required placeholder="z. B. 8b">
+      </div>
+    </div>
+    
+    <div class="form-group">
+      <label for="adresse">Anschrift (Straße, PLZ, Ort):</label>
+      <input type="text" id="adresse" required placeholder="z. B. Musterstraße 1, 31848 Bad Münder">
+    </div>
+
+    <div class="form-group">
+      <label for="elternName">Name des/der Erziehungsberechtigten:</label>
+      <input type="text" id="elternName" required placeholder="z. B. Erika Mustermann">
+    </div>
+
+    <h2>2. Gerät und Zubehör</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="verleihNr">Verleihnummer:</label>
+        <input type="text" id="verleihNr" required placeholder="z. B. V-2026-001">
+      </div>
+      <div class="form-group">
+        <label for="snIpad">Seriennummer iPad:</label>
+        <input type="text" id="snIpad" required placeholder="z. B. DMP123456789">
+      </div>
+      <div class="form-group">
+        <label for="snTastatur">Seriennummer Tastatur:</label>
+        <input type="text" id="snTastatur" placeholder="z. B. KBD987654321">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Ausgehändigtes Zubehör:</label>
+      <div class="checkbox-group">
+        <label><input type="checkbox" id="zubLadekabel" checked> Ladegerät inkl. Lightningkabel</label>
+        <label><input type="checkbox" id="zubTastatur" checked> Tastatur</label>
+        <label><input type="checkbox" id="zubStift"> aktiver Eingabestift</label>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="ausgabeDatum">Ausgabedatum (Leihbeginn):</label>
+        <input type="date" id="ausgabeDatum" required>
+      </div>
+      <div class="form-group">
+        <label for="leihEndeTyp">Ende der Leihzeit:</label>
+        <select id="leihEndeTyp" onchange="toggleEndDatum()">
+          <option value="schuljahr">Letzter Schultag des Schuljahres</option>
+          <option value="festeDatum">Bestimmtes Datum</option>
+        </select>
+      </div>
+      <div class="form-group" id="festeDatumGroup" style="display:none;">
+        <label for="endDatum">Enddatum:</label>
+        <input type="date" id="endDatum">
+      </div>
+    </div>
+
+    <h2>3. Digitale Unterschrift</h2>
+    <div class="form-group">
+      <label>Unterschrift des/der Erziehungsberechtigten / Entleihers:</label>
+      <canvas id="sigCanvas" width="500" height="120"></canvas>
+      <div style="margin-top: 5px;">
+        <button type="button" class="btn btn-secondary" onclick="clearCanvas()">Unterschrift löschen</button>
+      </div>
+    </div>
+
+    <div style="margin-top: 30px; text-align: center;">
+      <button type="button" class="btn" onclick="openPreview()">Vertragsvoransicht öffnen</button>
+    </div>
+  </form>
+</div>
+
+<!-- Modal für die Voransicht -->
+<div id="previewModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-actions">
+      <button class="btn" onclick="savePDF()">Als PDF Speichern</button>
+      <button class="btn" onclick="window.print()">Drucken</button>
+      <button class="btn btn-secondary" onclick="closePreview()">Schließen</button>
+    </div>
+
+    <div id="contractRender" class="contract-preview">
+      <h2>Leihvertrag über die Leihe eines mobilen Endgeräts<br>für Schülerinnen und Schüler</h2>
+      <p style="text-align: center;"><strong>Zwischen</strong><br>
+      der <strong>Kooperativen Gesamtschule Bad Münder (KGS Bad Münder)</strong><br>
+      Bahnhofstraße 52, 31848 Bad Münder, vertreten durch die Schulleitung<br>
+      <em>- im Folgenden Verleiher -</em></p>
+
+      <p style="text-align: center;"><strong>und</strong><br>
+      <span class="contract-field" id="p_schuelerName"></span>, <span class="contract-field" id="p_adresse"></span><br>
+      Schule und Jahrgang/Klasse: <span class="contract-field" id="p_klasse"></span><br>
+      vertreten durch: <span class="contract-field" id="p_elternName"></span><br>
+      <em>- im Folgenden Entleiher -</em></p>
+
+      <p>wird folgender Vertrag geschlossen:</p>
+
+      <h3>§ 1 Vertragsgegenstand</h3>
+      <p>(1) Der Verleiher stellt dem Entleiher im Schuljahr das im Folgenden näher bezeichnete mobile Endgerät und etwaiges Zubehör (im Folgenden: Leihobjekt) zur Verfügung:</p>
+      <ul>
+        <li><strong>Verleihnummer:</strong> <span class="contract-field" id="p_verleihNr"></span></li>
+        <li><strong>Seriennummer iPad:</strong> <span class="contract-field" id="p_snIpad"></span></li>
+        <li><strong>Seriennummer Tastatur:</strong> <span class="contract-field" id="p_snTastatur"></span></li>
+        <li><strong>Zubehör:</strong> <span id="p_zubehoer"></span></li>
+      </ul>
+      <p>(2) An dem Leihobjekt dürfen durch den Entleiher keine irreversiblen technischen Veränderungen vorgenommen werden.</p>
+      <p>(3) Das Leihobjekt befindet sich in dem aus der Anlage Vorschäden ersichtlichen Zustand.</p>
+
+      <h3>§ 2 Leihdauer</h3>
+      <p>(1) Die Leihzeit beginnt mit der Ausgabe des Leihobjekts durch den Leihgeber am <span class="contract-field" id="p_ausgabeDatum"></span> und endet: <span class="contract-field" id="p_leihEnde"></span>.</p>
+      <p>(2) Verlässt der Entleiher vor dem in Absatz 1 bestimmten Ende der Leihzeit die KGS Bad Münder, so endet die Leihzeit mit Ablauf des letzten Tages des Entleihers an dieser Schule.</p>
+      <p>(3) Der Entleiher hat das Leihobjekt und das ausgehändigte Zubehör unverzüglich nach dem Ablauf der Leihdauer in ordnungsgemäßem Zustand zurückzugeben.</p>
+
+      <h3>§ 3 Zweckbestimmung der Nutzung des Leihobjekts</h3>
+      <p>(1) Das Leihobjekt wird dem Entleiher für Zwecke der Unterrichtsvorbereitung, der Nutzung im Unterricht und für das Lernen an einem anderen Lernort zur Verfügung gestellt.<br>
+      (2) Die Nutzung der Endgeräte ist schulischen Zwecken vorbehalten.<br>
+      (3) Für die Einhaltung der Zweckbestimmung der Nutzung ist die/der Erziehungsberechtigte bzw. sind die Erziehungsberechtigten zuständig.</p>
+
+      <h3>§ 4 Geräteverwaltung</h3>
+      <p>(1) Apps und sonstige Software können ausschließlich durch den Verleiher (Administrator) installiert werden. Apps können von der Schule zur Installation für alle der Schule zugewiesenen Geräte angefordert werden.<br>
+      (2) Der Verleiher behält sich vor, jederzeit zentral gesteuerte Updates der auf den mobilen Endgeräten vorhandenen Software vorzunehmen, etwa um sicherheitsrelevante Lücken zu schließen.<br>
+      (3) Mit Hilfe der Mobilgeräteverwaltung überwacht und verwaltet der Verleiher Implementierungen mobiler Endgeräte. Die Schule administriert im Auftrag des Verleihers über die Mobilgeräteverwaltung mobile Endgeräte wie folgt: Entsperrcode zurücksetzen; Gerät sperren; Gerät auf Werkseinstellungen zurücksetzen; Übertragung von Nachrichten; Konformitätsregeln erstellen; Datenübertragung vordefinierter Apps; Ortung des Gerätes bei Bedarf.<br>
+      (4) Die Mobilgeräteverwaltung dient unter anderem dazu, die Datensicherheit und Vertraulichkeit des Umgangs der Daten zu gewährleisten. Eine Haftung des Verleihers für gelöschte Daten ist ausgeschlossen.<br>
+      (5) Voraussetzung für die Einrichtung des mobilen Endgerätes ist die Verarbeitung personenbezogener Daten des Entleihers.</p>
+
+      <h3>§ 5 Verhaltenspflichten des Entleihers</h3>
+      <p>(1) Der Entleiher hat jede Nutzung des Leihobjekts zu unterlassen, die erkennbar geeignet ist, den Interessen oder dem Ansehen des Verleihers zu schaden. Verboten ist insbesondere der Abruf verfassungsfeindlicher, rassistischer, gewaltverherrlichender oder pornografischer Inhalte.<br>
+      (2) Die getroffenen Sicherheitsvorkehrungen dürfen nicht verändert oder umgangen werden.<br>
+      (3) Die direkte Verbindung mit anderen Geräten zwecks Datenübertragung ist nur mit vertrauenswürdigen Quellen zulässig. Funktechniken (Bluetooth/WLAN) sind bei Nichtbenutzung zu deaktivieren.<br>
+      (4) Bei Verdacht auf Schadsoftwarebefall ist unverzüglich die Schule zu informieren.<br>
+      (5) Der Entleiher ist verpflichtet, das Leihobjekt pfleglich zu behandeln und jederzeit vorzuführen.</p>
+
+      <h3>§ 6 bis § 10 Sicherung, Haftung & Besondere Bestimmungen</h3>
+      <p><strong>§ 6 Datenspeicherung:</strong> Daten sollten nicht lokal auf dem Gerät gespeichert werden. Der Verleiher übernimmt keine Verantwortung für Datenverlust.<br>
+      <strong>§ 7 Eigenverantwortung:</strong> Der Entleiher ist für den rechtmäßigen Einsatz des Gerätes verantwortlich.<br>
+      <strong>§ 8 Aufbewahrung:</strong> Das Gerät ist sicher aufzubewahren und in der ausgehändigten Schutzhülle zu belassen.<br>
+      <strong>§ 9 Sicherung:</strong> Schutz mit 6-stelligem Code. Ortungsdienste sind ständig aktiviert.<br>
+      <strong>§ 10 Sicherheitsanforderungen:</strong> Einsatz eines Contentfilters (Jugendschutzfilter nach § 14 Abs. 2 Nr. 3 JuSchG für ab 12 Jahre).</p>
+
+      <h3>§ 11 bis § 14 Rechtliches</h3>
+      <p><strong>§ 11 Haftung:</strong> Für Schäden haften Schülerinnen und Schüler bzw. Erziehungsberechtigte nach den gesetzlichen Vorgaben.<br>
+      <strong>§ 12 Weitergabe:</strong> Weitergabe an Dritte ist untersagt.<br>
+      <strong>§ 13 Verlust/Diebstahl:</strong> Verlust ist unverzüglich zu melden, bei Diebstahl ist Strafanzeige zu erstatten.<br>
+      <strong>§ 14 Sonstiges:</strong> Änderungen bedürfen der Schriftform. Das Hinweisblatt wurde ausgehändigt.</p>
+
+      <br>
+      <p>Bad Münder, den <span class="contract-field" id="p_datumAktuell"></span></p>
+
+      <table style="width:100%; margin-top: 30px; text-align: center;">
+        <tr>
+          <td style="width:50%; vertical-align: bottom;">
+            <div id="p_sigContainer">
+              <img id="p_sigImage" class="signature-img" src="" alt="Unterschrift">
+            </div>
+            ________________________________________<br>
+            Unterschrift Entleiher / Erziehungsberechtigte(r)
+          </td>
+          <td style="width:50%; vertical-align: bottom;">
+            <br><br>
+            ________________________________________<br>
+            Für den Verleiher: Schulleitung (mit Stempel)
+          </td>
+        </tr>
+      </table>
+
+      <hr style="margin-top: 40px; border: 0; border-top: 1px solid #ccc;">
+
+      <h3>Anlage: Vorschäden & Rückgabe</h3>
+      <p>Seriennummer des Gerätes: <span class="contract-field" id="p_snIpadAnlage"></span></p>
+      <p>Mängelbeschreibung: Keine bekannten Vorschäden bei Übergabe.</p>
+      <p>[  ] Tablet in einwandfreiem Zustand zurückgenommen<br>
+      [  ] Tablet weist Mängel auf</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Setze Standard-Ausgabedatum auf heute
+  document.getElementById('ausgabeDatum').valueAsDate = new Date();
+
+  // Canvas / Unterschrift Logik
+  const canvas = document.getElementById('sigCanvas');
+  const ctx = canvas.getContext('2d');
+  let isDrawing = false;
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    };
+  }
+
+  function startDrawing(e) {
+    isDrawing = true;
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+  }
+
+  function draw(e) {
+    if (!isDrawing) return;
+    const pos = getPos(e);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = "#000080";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  function stopDrawing() {
+    isDrawing = false;
+  }
+
+  canvas.addEventListener('mousedown', startDrawing);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', stopDrawing);
+  canvas.addEventListener('mouseleave', stopDrawing);
+
+  canvas.addEventListener('touchstart', (e) => { startDrawing(e); e.preventDefault(); });
+  canvas.addEventListener('touchmove', (e) => { draw(e); e.preventDefault(); });
+  canvas.addEventListener('touchend', stopDrawing);
+
+  function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function toggleEndDatum() {
+    const typ = document.getElementById('leihEndeTyp').value;
+    document.getElementById('festeDatumGroup').style.display = typ === 'festeDatum' ? 'block' : 'none';
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    return `${parts[2]}.${parts[1]}.${parts[0]}`;
+  }
+
+  // Voransicht befüllen und öffnen
+  function openPreview() {
+    const name = document.getElementById('schuelerName').value;
+    if (!name) {
+      alert('Bitte geben Sie mindestens den Namen des Schülers an.');
+      return;
+    }
+
+    // Felder in Vorschau übertragen
+    document.getElementById('p_schuelerName').innerText = name;
+    document.getElementById('p_klasse').innerText = document.getElementById('klasse').value;
+    document.getElementById('p_adresse').innerText = document.getElementById('adresse').value;
+    document.getElementById('p_elternName').innerText = document.getElementById('elternName').value;
+
+    document.getElementById('p_verleihNr').innerText = document.getElementById('verleihNr').value;
+    document.getElementById('p_snIpad').innerText = document.getElementById('snIpad').value;
+    document.getElementById('p_snIpadAnlage').innerText = document.getElementById('snIpad').value;
+    document.getElementById('p_snTastatur').innerText = document.getElementById('snTastatur').value || '—';
+
+    // Zubehör
+    let zub = [];
+    if (document.getElementById('zubLadekabel').checked) zub.push('Ladegerät inkl. Lightningkabel');
+    if (document.getElementById('zubTastatur').checked) zub.push('Tastatur');
+    if (document.getElementById('zubStift').checked) zub.push('aktiver Eingabestift');
+    document.getElementById('p_zubehoer').innerText = zub.join(', ');
+
+    // Datumsangaben
+    document.getElementById('p_ausgabeDatum').innerText = formatDate(document.getElementById('ausgabeDatum').value);
+    
+    const leihTyp = document.getElementById('leihEndeTyp').value;
+    if (leihTyp === 'schuljahr') {
+      document.getElementById('p_leihEnde').innerText = 'mit dem letzten Schultag des aktuellen Schuljahres';
+    } else {
+      document.getElementById('p_leihEnde').innerText = 'am ' + formatDate(document.getElementById('endDatum').value);
+    }
+
+    document.getElementById('p_datumAktuell').innerText = formatDate(document.getElementById('ausgabeDatum').value);
+
+    // Unterschrift übertragen
+    const dataUrl = canvas.toDataURL();
+    document.getElementById('p_sigImage').src = dataUrl;
+
+    // Modal anzeigen
+    document.getElementById('previewModal').style.display = 'block';
+  }
+
+  function closePreview() {
+    document.getElementById('previewModal').style.display = 'none';
+  }
+
+  // PDF Export mit html2pdf
+  function savePDF() {
+    const element = document.getElementById('contractRender');
+    const schueler = document.getElementById('schuelerName').value || 'Entleiher';
+    
+    const opt = {
+      margin:       10,
+      filename:     `Leihvertrag_${schueler.replace(/\s+/g, '_')}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2 },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).save();
+  }
+</script>
+
+</body>
+</html>
