@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KGS Bad Münder - Geräteausleihe & Cloud-Verwaltung</title>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    :root { --primary: #1b365d; --primary-hover: #2c5282; --bg-light: #f8fafc; --card-bg: #ffffff; --border: #e2e8f0; --text: #1a202c; --text-muted: #718096; --success: #38a169; --warning: #dd6b20; --info: #3182ce; --danger: #e53e3e; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #edf2f7; color: var(--text); }
+    header { background-color: var(--primary); color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    header h1 { margin: 0; font-size: 20px; }
+    nav { display: flex; gap: 10px; }
+    main { max-width: 1100px; margin: 25px auto; padding: 0 20px; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .card { background: var(--card-bg); border-radius: 8px; padding: 25px; margin-bottom: 25px; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 25px; }
+    .action-card { background: white; padding: 25px; border-radius: 8px; border: 2px solid var(--border); text-align: center; cursor: pointer; transition: all 0.2s ease; }
+    .action-card:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(27, 54, 93, 0.12); }
+    .action-card h3 { margin-top: 0; color: var(--primary); font-size: 20px; }
+    .action-card p { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 25px; }
+    .stat-card { background: white; padding: 20px; border-radius: 8px; border-left: 4px solid var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .stat-card .value { font-size: 28px; font-weight: bold; color: var(--primary); }
+    .stat-card .label { color: var(--text-muted); font-size: 13px; }
+    .activity-log { max-height: 200px; overflow-y: auto; background: var(--bg-light); border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-size: 13px; font-family: Consolas, monospace; }
+    .log-item { padding: 5px 0; border-bottom: 1px dashed #e2e8f0; display: flex; justify-content: space-between; }
+    .log-time { color: var(--text-muted); font-weight: bold; }
+    .btn { background-color: var(--primary); color: white; border: none; padding: 10px 18px; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: background-color 0.2s; }
+    .btn:hover { background-color: var(--primary-hover); }
+    .btn-secondary { background-color: #718096; }
+    .btn-secondary:hover { background-color: #4a5568; }
+    .btn-success { background-color: var(--success); }
+    .btn-success:hover { background-color: #2f855a; }
+    .btn-info { background-color: var(--info); }
+    .btn-danger { background-color: var(--danger); }
+    .btn-danger:hover { background-color: #c53030; }
+    .btn-outline { background: transparent; border: 1px solid white; color: white; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .nav-bar-bottom { display: flex; justify-content: space-between; margin-top: 25px; padding-top: 15px; border-top: 1px solid var(--border); }
+    .form-group { margin-bottom: 15px; }
+    .form-row { display: flex; gap: 15px; }
+    .form-row .form-group { flex: 1; }
+    label { display: block; margin-bottom: 6px; font-weight: bold; font-size: 13px; }
+    input[type="text"], input[type="password"], input[type="date"], input[type="file"], select, textarea { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 5px; font-size: 14px; font-family: Arial, sans-serif;}
+    .checkbox-group { display: flex; gap: 20px; margin-top: 8px; flex-wrap: wrap; }
+    .checkbox-group label { font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 5px;}
+    canvas { border: 1px dashed var(--border); border-radius: 5px; background: #fafafa; cursor: crosshair; touch-action: none; width: 100%; max-width: 500px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 14px; }
+    th { background-color: var(--bg-light); color: var(--primary); }
+    .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+    .badge-success { background: #c6f6d5; color: #22543d; }
+    .badge-cloud { background: #bee3f8; color: #2b6cb0; }
+    .badge-warning { background: #feebc8; color: #c05621; }
+    
+    .search-container { position: relative; }
+    .search-results { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-top: none; max-height: 150px; overflow-y: auto; z-index: 1010; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 0 0 5px 5px; }
+    .search-item { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #edf2f7; font-size: 14px; }
+    .search-item:hover { background: #ebf8ff; color: var(--primary); }
+
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+    .modal.active { display: flex; }
+    .modal-content { background: white; border-radius: 8px; width: 100%; max-width: 550px; padding: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); max-height: 90vh; display: flex; flex-direction: column; }
+    .modal-content-large { max-width: 800px; }
+    .modal-body { overflow-y: auto; padding-right: 10px; margin-bottom: 15px; }
+    
+    .cloud-provider-list { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; }
+    .cloud-provider-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+    .contract-preview { font-size: 13px; line-height: 1.5; color: #000; background: white; padding: 30px; border: 1px solid var(--border); border-radius: 6px; }
+    .contract-preview h2 { text-align: center; font-size: 18px; color: black; }
+    .contract-preview h3 { font-size: 14px; margin-top: 18px; border-bottom: 1px solid #ddd; }
+    .contract-field { font-weight: bold; text-decoration: underline; }
+    .signature-img { max-height: 50px; vertical-align: bottom; }
+    
+    .doc-link { color: var(--info); text-decoration: underline; cursor: pointer; font-weight: bold; }
+    .doc-link:hover { color: var(--primary-hover); }
+    .rules-text { font-size: 13px; line-height: 1.6; color: #333; }
+    .rules-text h2 { color: var(--primary); font-size: 18px; margin-top: 0; text-align: center; border-bottom: 2px solid var(--primary); padding-bottom: 10px; }
+    .rules-text h3 { color: var(--primary); font-size: 15px; margin-top: 20px; }
+    .rules-text ul { padding-left: 20px; margin-top: 5px; }
+    .rules-text li { margin-bottom: 5px; }
+
+    @media print { header, nav, .btn, .nav-bar-bottom, .no-print, .modal { display: none !important; } body { background: white; margin: 0; } main { max-width: 100%; margin: 0; padding: 0; } .page { display: block !important; } #dashboardPage, #schuelerFormPage, #lehrerFormPage, #schadensPage { display: none !important; } .contract-preview { border: none; padding: 0; } }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>KGS Bad Münder | Geräteausleihe</h1>
+    <nav class="no-print">
+      <button class="btn btn-outline" onclick="showPage('dashboardPage')">Dashboard</button>
+      <button class="btn btn-outline" onclick="showPage('schuelerFormPage')">Ausleihe Schüler</button>
+      <button class="btn btn-outline" onclick="showPage('lehrerFormPage')">Ausleihe Lehrer</button>
+      <button class="btn btn-outline" onclick="showPage('schadensPage')" style="background: rgba(255,255,255,0.2);">Schadensmeldungen</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- EBENE 1: DASHBOARD -->
+    <div id="dashboardPage" class="page active">
+      <div class="card" style="padding: 15px 25px; margin-bottom: 20px; background: #ebf8ff; border-color: #bee3f8;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+          <div>
+            <strong>Aktiver Cloud-Speicherort:</strong> 
+            <span id="cloudStatusText" class="badge badge-warning" style="margin-left: 8px;">Nicht verbunden</span>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-info" onclick="openModal('cloudModal')">Cloudverbindung einrichten</button>
+            <button class="btn btn-success" onclick="exportToExcel()">Excel-Datenbank herunterladen</button>
+          </div>
+        </div>
+      </div>
+
+      <h2>Arbeitsschritt wählen</h2>
+      <div class="action-grid">
+        <div class="action-card" onclick="showPage('schuelerFormPage')">
+          <h3>Schüler-Ausleihe</h3>
+          <p>Erstellt den Schülerleihvertrag für iPads inklusive Erziehungsberechtigten und Zubehör.</p>
+          <button class="btn">Schülerleihvertrag starten</button>
+        </div>
+        <div class="action-card" onclick="showPage('lehrerFormPage')">
+          <h3>Lehrer-Ausleihe</h3>
+          <p>Erstellt die Leihvereinbarung für Dienstgeräte der Lehrkräfte und Mitarbeiter.</p>
+          <button class="btn btn-secondary">Lehrerleihvertrag starten</button>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card"><div class="value" id="statSchueler">0</div><div class="label">Aktive Schülerverträge</div></div>
+        <div class="stat-card"><div class="value" id="statLehrer">0</div><div class="label">Aktive Lehrerverträge</div></div>
+        <div class="stat-card" style="border-left-color: var(--success);"><div class="value" id="statGeraete">0</div><div class="label">Ausgeliehene Geräte gesamt</div></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top: 0;">Letzte System- und Cloud-Abläufe (Activity Log)</h3>
+        <div class="activity-log" id="activityLog"></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin: 0; margin-bottom:10px;">Aktuelle Ausleihen (Server-Datenbank)</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Rolle</th>
+              <th>Name</th>
+              <th>Klasse/Kürzel</th>
+              <th>Verleih-Nr.</th>
+              <th>Gerät (S/N)</th>
+              <th>Datum</th>
+              <th>Status</th>
+              <th>Aktionen</th>
+            </tr>
+          </thead>
+          <tbody id="loansTableBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- EBENE 4: SCHADENS- UND SUPPORTMANAGEMENT -->
+    <div id="schadensPage" class="page">
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 15px; margin-bottom: 20px;">
+          <h2 style="margin: 0; color: var(--primary);">🛠️ Schadens- und Supportmanagement</h2>
+          <button class="btn btn-info" onclick="openTicketModal()">+ Neue Schadensmeldung aufgeben</button>
+        </div>
+
+        <h4 style="margin-top: 0; color: var(--text-muted);">📡 Live-Ticker: Aktuelle Support-Abläufe</h4>
+        <div class="activity-log" id="ticketTicker" style="margin-bottom: 30px; border-left: 4px solid var(--warning);">
+        </div>
+
+        <h4 style="margin-top: 0; color: var(--text-muted);">📋 Offene und geschlossene Meldungen</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Ticket</th>
+              <th>Datum</th>
+              <th>Entleiher</th>
+              <th>S/N Gerät</th>
+              <th>Schadensart</th>
+              <th>Status</th>
+              <th>Aktion</th>
+            </tr>
+          </thead>
+          <tbody id="ticketsTableBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- EBENE 2A: SCHÜLERLEIHVERTRAG FORMULAR -->
+    <div id="schuelerFormPage" class="page">
+      <div class="card">
+        <h2 style="margin: 0 0 20px 0; font-size: 18px; color: var(--primary);">Ausleihe: Schülerleihvertrag</h2>
+        
+        <div class="form-group" style="background:#e2e8f0; padding:15px; border-radius:5px; margin-bottom: 20px;">
+            <label style="color:var(--primary); font-size: 14px;">Art der Vertragserfassung:</label>
+            <select id="schuelerErfassungsArt" onchange="toggleErfassungsArt('schueler')" style="font-weight: bold;">
+                <option value="digital">Komplett digital (am Gerät ausfüllen & digital signieren)</option>
+                <option value="analog">Analogen Vertrag hochladen (Scans/PDF manuell hinterlegen)</option>
+            </select>
+        </div>
+
+        <form id="schuelerForm">
+          <h3 style="font-size: 15px;">1. Stamm- und Gerätedaten (Für Datenbank)</h3>
+          <div class="form-row">
+            <div class="form-group"><label>Name, Vorname:</label><input type="text" id="schuelerName" required></div>
+            <div class="form-group"><label>Klasse / Jahrgang:</label><input type="text" id="klasse" required></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Verleihnummer:</label><input type="text" id="verleihNr" required></div>
+            <div class="form-group"><label>Seriennummer iPad:</label><input type="text" id="snIpad" required></div>
+          </div>
+
+          <div id="schuelerDigitalSection">
+              <div class="form-group"><label>Anschrift:</label><input type="text" id="adresse"></div>
+              <div class="form-group"><label>Name Erziehungsberechtigte/r:</label><input type="text" id="elternName"></div>
+              
+              <div class="form-group"><label>Seriennummer Tastatur:</label><input type="text" id="snTastatur"></div>
+              <div class="form-group">
+                <label>Zubehör:</label>
+                <div class="checkbox-group">
+                  <label><input type="checkbox" id="zubLadekabel" checked> Ladegerät + Kabel</label>
+                  <label><input type="checkbox" id="zubTastatur" checked> Tastatur</label>
+                  <label><input type="checkbox" id="zubStift"> Eingabestift</label>
+                </div>
+              </div>
+              
+              <div class="form-row">
+                <div class="form-group"><label>Ausgabedatum:</label><input type="date" id="ausgabeDatum"></div>
+                <div class="form-group">
+                  <label>Rückgabedatum:</label>
+                  <select id="schuelerRueckgabeArt" onchange="toggleRueckgabeDatum('schueler')">
+                    <option value="Schuljahresende">Schuljahresende</option>
+                    <option value="Individuell">Abweichendes Datum wählen...</option>
+                  </select>
+                  <input type="date" id="schuelerRueckgabeDatum" style="display:none; margin-top:8px;">
+                </div>
+              </div>
+
+              <h3 style="font-size: 15px; margin-top: 25px;">2. Rechtliches & Unterschrift</h3>
+              <div class="form-group" style="background: #f7fafc; padding: 10px; border: 1px solid var(--border); border-radius: 5px;">
+                <label style="margin: 0; display:flex; align-items: center; gap: 10px;">
+                  <input type="checkbox" id="schuelerNutzungsordnung" style="width: auto;">
+                  <span>Ich habe die <span class="doc-link" onclick="openModal('rulesModal')">Nutzungsordnung der KGS Bad Münder</span> zur Kenntnis genommen und akzeptiere die Bedingungen.</span>
+                </label>
+              </div>
+
+              <div class="form-group" style="background: #f7fafc; padding: 10px; border: 1px solid var(--border); border-radius: 5px; margin-top: 10px;">
+                <label style="margin: 0; display:flex; align-items: center; gap: 10px;">
+                  <input type="checkbox" id="schuelerRechtliches" style="width: auto;">
+                  <span>Ich habe die <span class="doc-link" onclick="openModal('legalModalSchueler')">rechtlichen Rahmenbedingungen</span> der Endgeräte-Ausleihe gelesen und akzeptiere sie.</span>
+                </label>
+              </div>
+              
+              <div class="form-group" style="margin-top: 15px;">
+                <label>Unterschrift Erziehungsberechtigte/r / Schüler/in:</label>
+                <canvas id="sigCanvasSchueler" width="500" height="120"></canvas>
+                <div><button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; margin-top: 5px;" onclick="clearCanvas(ctxSchueler, canvasSchueler)">Zurücksetzen</button></div>
+              </div>
+              <div class="nav-bar-bottom">
+                <button type="button" class="btn btn-secondary" onclick="showPage('dashboardPage')">Abbrechen</button>
+                <button type="button" class="btn" onclick="buildAndShowPreviewSchueler()">Vertragsvoransicht öffnen</button>
+              </div>
+          </div>
+
+          <div id="schuelerAnalogSection" style="display:none; margin-top: 25px; padding-top: 20px; border-top: 2px dashed var(--border);">
+              <h3 style="font-size: 15px;">2. Analoger Upload</h3>
+              <div class="form-group">
+                  <label>Unterschriebenen Vertrag hochladen (nur PDF):</label>
+                  <input type="file" id="schuelerUploadFile" accept="application/pdf">
+              </div>
+              <div class="form-group" style="background: #f7fafc; padding: 10px; border: 1px solid var(--border); border-radius: 5px;">
+                  <label style="margin: 0; display:flex; align-items: flex-start; gap: 10px;">
+                    <input type="checkbox" id="schuelerAdminCheck" style="width: auto; margin-top: 4px;">
+                    <span style="font-weight: normal;"><strong>Admin-Bestätigung:</strong> Ich bestätige, dass der Vertrag analog unterzeichnet wurde und alle Bedingungen der Ausleihe (Nutzungsordnung & Rechtliches) vom Entleiher akzeptiert wurden. Die Datenbank wird entsprechend aktualisiert.</span>
+                  </label>
+              </div>
+              <div class="nav-bar-bottom">
+                  <button type="button" class="btn btn-secondary" onclick="showPage('dashboardPage')">Abbrechen</button>
+                  <button type="button" class="btn btn-success" onclick="saveAnalogContract('schueler')">Upload & In Datenbank speichern</button>
+              </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- EBENE 2B: LEHRERLEIHVERTRAG FORMULAR -->
+    <div id="lehrerFormPage" class="page">
+      <div class="card">
+        <h2 style="margin: 0 0 20px 0; font-size: 18px; color: var(--primary);">Ausleihe: Lehrerleihvertrag</h2>
+        
+        <div class="form-group" style="background:#e2e8f0; padding:15px; border-radius:5px; margin-bottom: 20px;">
+            <label style="color:var(--primary); font-size: 14px;">Art der Vertragserfassung:</label>
+            <select id="lehrerErfassungsArt" onchange="toggleErfassungsArt('lehrer')" style="font-weight: bold;">
+                <option value="digital">Komplett digital (am Gerät ausfüllen & digital signieren)</option>
+                <option value="analog">Analogen Vertrag hochladen (Scans/PDF manuell hinterlegen)</option>
+            </select>
+        </div>
+
+        <form id="lehrerForm">
+          <h3 style="font-size: 15px;">1. Stamm- und Gerätedaten (Für Datenbank)</h3>
+          <div class="form-row">
+            <div class="form-group"><label>Name, Vorname:</label><input type="text" id="lehrerName" required></div>
+            <div class="form-group"><label>Kürzel / Fachbereich:</label><input type="text" id="lehrerKuerzel"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Verleihnummer (optional):</label><input type="text" id="lehrerVerleihNr"></div>
+            <div class="form-group"><label>Seriennummer:</label><input type="text" id="lehrerSN" required></div>
+          </div>
+
+          <div id="lehrerDigitalSection">
+              <div class="form-group"><label>Anschrift:</label><input type="text" id="lehrerAdresse"></div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Endgerät Typ:</label>
+                  <select id="lehrerGeraetTyp">
+                    <option value="Apple iPad Air 10.9">Apple iPad Air 10.9"</option>
+                    <option value="Apple iPad Pro 11">Apple iPad Pro 11"</option>
+                    <option value="Apple iPad Pro 12.9">Apple iPad Pro 12.9"</option>
+                    <option value="Microsoft Surface Pro">Microsoft Surface Pro</option>
+                    <option value="Anderes...">Anderes...</option>
+                  </select>
+                </div>
+                <div class="form-group"><label>Zubehör:</label><input type="text" id="lehrerZubehoer" value="Netzteil, Kabel, Hülle"></div>
+              </div>
+              <div class="form-group"><label>Bemerkungen / Zustand:</label><input type="text" id="lehrerBemerkungen" value="Neugerät"></div>
+              
+              <div class="form-row">
+                <div class="form-group"><label>Ausgabedatum:</label><input type="date" id="lehrerAusgabeDatum"></div>
+                <div class="form-group">
+                  <label>Rückgabedatum:</label>
+                  <select id="lehrerRueckgabeArt" onchange="toggleRueckgabeDatum('lehrer')">
+                    <option value="Schuljahresende">Schuljahresende</option>
+                    <option value="Individuell">Abweichendes Datum wählen...</option>
+                  </select>
+                  <input type="date" id="lehrerRueckgabeDatum" style="display:none; margin-top:8px;">
+                </div>
+              </div>
+
+              <h3 style="font-size: 15px; margin-top: 25px;">2. Rechtliches & Unterschrift</h3>
+              <div class="form-group" style="background: #f7fafc; padding: 10px; border: 1px solid var(--border); border-radius: 5px;">
+                <label style="margin: 0; display:flex; align-items: center; gap: 10px;">
+                  <input type="checkbox" id="lehrerNutzungsordnung" style="width: auto;">
+                  <span>Ich habe die <span class="doc-link" onclick="openModal('rulesModal')">Nutzungsbedingungen für dienstliche Endgeräte</span> zur Kenntnis genommen und akzeptiere diese.</span>
+                </label>
+              </div>
+
+              <div class="form-group" style="background: #f7fafc; padding: 10px; border: 1px solid var(--border); border-radius: 5px; margin-top: 10px;">
+                <label style="margin: 0; display:flex; align-items: center; gap: 10px;">
+                  <input type="checkbox" id="lehrerRechtliches" style="width: auto;">
+                  <span>Ich habe die <span class="doc-link" onclick="openModal('legalModalLehrer')">rechtlichen Rahmenbedingungen</span> der Endgeräte-Ausleihe gelesen und akzeptiere sie.</span>
+                </label>
+              </div>
+
+              <div class="form-group" style="margin-top: 15px;">
+                <label>Unterschrift Lehrkraft:</label>
+                <canvas id="sigCanvasLehrer" width="500" height="120"></canvas>
+                <div><button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; margin-top: 5px;" onclick="clearCanvas(ctxLehrer, canvasLehrer)">Zurücksetzen</button></div>
+              </div>
+              <div class="nav-bar-bottom">
+                <button type="button" class="btn btn-secondary" onclick="showPage('dashboardPage')">Abbrechen</button>
+                <button type="button" class="btn" onclick="buildAndShowPreviewLehrer()">Vertragsvoransicht öffnen</button>
+              </div>
+          </div>
+
+          <div id="lehrerAnalogSection" style="display:none; margin-top: 25px; padding-top: 20px; border-top: 2px dashed var(--border);">
+              <h3 style="font-size: 15px;">2. Analoger Upload</h3>
+              <div class="form-group">
+                  <label>Unterschriebenen Vertrag hochladen (nur PDF):</label>
+                  <input type="file" id="lehrerUploadFile" accept="application/pdf">
+              </div>
+              <div class="form-group" style="background: #f7fafc; padding: 10px; border: 1px solid var(--border); border-radius: 5px;">
+                  <label style="margin: 0; display:flex; align-items: flex-start; gap: 10px;">
+                    <input type="checkbox" id="lehrerAdminCheck" style="width: auto; margin-top: 4px;">
+                    <span style="font-weight: normal;"><strong>Admin-Bestätigung:</strong> Ich bestätige, dass der Vertrag analog unterzeichnet wurde und alle Bedingungen der Ausleihe akzeptiert wurden. Die Datenbank wird entsprechend aktualisiert.</span>
+                  </label>
+              </div>
+              <div class="nav-bar-bottom">
+                  <button type="button" class="btn btn-secondary" onclick="showPage('dashboardPage')">Abbrechen</button>
+                  <button type="button" class="btn btn-success" onclick="saveAnalogContract('lehrer')">Upload & In Datenbank speichern</button>
+              </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- EBENE 3A/3B VORSCHAU -->
+    <div id="previewPageSchueler" class="page">
+      <div class="card no-print">
+        <div style="display: flex; justify-content: space-between;">
+          <button class="btn btn-secondary" onclick="showPage('schuelerFormPage')">Zurück zum Formular</button>
+          <button class="btn btn-success" onclick="saveContract('schueler')">Als PDF & auf Server speichern</button>
+        </div>
+      </div>
+      <div id="contractRenderSchueler" class="contract-preview">
+        <h2>Leihvertrag über die Leihe eines mobilen Endgeräts<br>für Schülerinnen und Schüler</h2>
+        <p style="text-align: center;"><strong>Zwischen</strong><br>der <strong>Kooperativen Gesamtschule Bad Münder (KGS Bad Münder)</strong><br>Bahnhofstraße 52, 31848 Bad Münder, vertreten durch die Schulleitung<br><em>- im Folgenden Verleiher -</em></p>
+        <p style="text-align: center;"><strong>und</strong><br><span class="contract-field" id="p_schuelerName"></span>, <span class="contract-field" id="p_adresse"></span><br>Schule und Jahrgang / Klasse: <span class="contract-field" id="p_klasse"></span><br>vertreten durch: <span class="contract-field" id="p_elternName"></span><br><em>- im Folgenden Entleiher -</em></p>
+        <p>wird folgender Vertrag geschlossen:</p>
+        <h3>§ 1 Vertragsgegenstand</h3>
+        <p>(1) Der Verleiher stellt dem Entleiher im Schuljahr das im Folgenden näher bezeichnete mobile Endgerät und etwaiges Zubehör (im Folgenden: Leihobjekt) zur Verfügung:</p>
+        <ul style="list-style-type: none; padding-left: 0;">
+          <li>• Verleihnummer: <span class="contract-field" id="p_verleihNr"></span></li>
+          <li>• Seriennummer iPad: <span class="contract-field" id="p_snIpad"></span></li>
+          <li>• Seriennummer Tastatur: <span class="contract-field" id="p_snTastatur"></span></li>
+          <li>• Zubehör: <span id="p_zubehoer"></span></li>
+        </ul>
+        <p>(2) An dem Leihobjekt dürfen durch den Entleiher keine irreversiblen technischen Veränderungen vorgenommen werden.<br>(3) Das Leihobjekt befindet sich in dem aus der Anlage Vorschäden ersichtlichen Zustand.</p>
+        
+        <h3>§ 2 Leihdauer und Beendigung des Leihvertrages</h3>
+        <p>(1) Die Leihzeit beginnt mit der Ausgabe des Leihobjekts durch den Leihgeber am <span class="contract-field" id="p_ausgabeDatum"></span>.<br>
+        (2) Der/Die Entleihende verpflichtet sich, den Vertragsgegenstand spätestens zum vereinbarten Rückgabedatum in ordnungsgemäßem Zustand zurückzugeben. Als Rückgabedatum gilt das Ende des aktuellen Schuljahres, sofern nachfolgend kein abweichendes Datum individuell vereinbart wurde.<br>
+        <strong>Vereinbartes Rückgabedatum:</strong> <span class="contract-field" id="p_leihEnde"></span><br>
+        (3) Verlässt der Entleiher vor dem in Absatz 1 bestimmten Ende der Leihzeit die KGS Bad Münder, so endet die Leihzeit mit Ablauf des letzten Tages des Entleihers an dieser Schule.</p>
+        
+        <h3>§ 3 Zweckbestimmung der Nutzung des Leihobjekts</h3>
+        <p>(1) Das Leihobjekt wird dem Entleiher für Zwecke der Unterrichtsvorbereitung, der Nutzung im Unterricht und für das Lernen an einem anderen Lernort zur Verfügung gestellt.<br>
+        (2) Die Nutzung der Endgeräte ist schulischen Zwecken vorbehalten.<br>
+        (3) Für die Einhaltung der Zweckbestimmung der Nutzung ist die/der Erziehungsberechtigte bzw. sind die Erziehungsberechtigten zuständig.</p>
+        <h3>§ 4 Geräteverwaltung</h3>
+        <p>(1) Apps und sonstige Software können ausschließlich durch den Verleiher (Administrator) installiert werden.<br>
+        (2) Der Verleiher behält sich vor, jederzeit zentral gesteuerte Updates vorzunehmen.<br>
+        (3) Mit Hilfe der Mobilgeräteverwaltung (MDM) überwacht und verwaltet der Verleiher Implementierungen mobiler Endgeräte.<br>
+        (4) Die Haftung des Verleihers für gelöschte Daten ist ausgeschlossen.<br>
+        (5) Voraussetzung ist die Verarbeitung personenbezogener Daten des Entleihers.</p>
+        <h3>§ 5 bis § 14 Weitere Bestimmungen</h3>
+        <p><strong>§ 5 Verhaltenspflichten:</strong> Der Entleiher hat die Nutzung für verfassungsfeindliche, gewaltverherrlichende oder pornografische Inhalte zu unterlassen.<br>
+        <strong>§ 6 Datenspeicherung:</strong> Speicherung soll möglichst in der Niedersächsischen Bildungscloud erfolgen.<br>
+        <strong>§ 7 Eigenverantwortung:</strong> Der Entleiher ist für den rechtmäßigen Einsatz verantwortlich.<br>
+        <strong>§ 8 Aufbewahrung:</strong> Das Gerät ist sicher und in der Schutzhülle aufzubewahren.<br>
+        <strong>§ 9 Sicherung:</strong> Ein 6-stelliger Entsperrcode ist Pflicht. Ortungsdienste sind aktiviert.<br>
+        <strong>§ 10 Sicherheit:</strong> Ein Contentfilter nach § 14 Jugendschutzgesetz wird eingesetzt.<br>
+        <strong>§ 11 Haftung:</strong> Entleiher/Erziehungsberechtigte haften nach gesetzlichen Vorgaben.<br>
+        <strong>§ 12 Weitergabe:</strong> Eine Weitergabe an Dritte ist untersagt.<br>
+        <strong>§ 13 Verlust/Diebstahl:</strong> Umgehende Meldepflicht bei der Schule und ggf. Polizei.<br>
+        <strong>§ 14 Sonstiges:</strong> Die Kenntnisnahme der verbindlichen Hinweise und der Nutzungsordnung wird hiermit bestätigt.</p>
+        <br><br>
+        <p>Bad Münder, den <span class="contract-field" id="p_datumAktuell"></span></p>
+        <table style="width:100%; text-align: center; border:none;">
+          <tr style="border:none;">
+            <td style="width:50%; border:none;"><img id="p_sigImageSchueler" class="signature-img" src="" alt=""><br>_________________________<br>Entleiher (Schüler) / Erziehungsberechtigte(r)</td>
+            <td style="width:50%; border:none;"><br><br>_________________________<br>Für den Verleiher: Schulleitung (Stempel)</td>
+          </tr>
+        </table>
+        <hr style="margin-top: 30px; border: 0; border-top: 1px solid #ccc;">
+        <h3>Anlage Vorschäden</h3>
+        <p>Die unter § 1 Abs. 1 des Leihvertrages aufgelisteten mobilen Geräte sowie etwaiges Zubehör weisen folgende Vorschäden auf:<br>
+        Seriennummer des Gerätes: <span class="contract-field" id="p_snIpadAnlage"></span></p>
+      </div>
+    </div>
+
+    <div id="previewPageLehrer" class="page">
+      <div class="card no-print">
+        <div style="display: flex; justify-content: space-between;">
+          <button class="btn btn-secondary" onclick="showPage('lehrerFormPage')">Zurück zum Formular</button>
+          <button class="btn btn-success" onclick="saveContract('lehrer')">Als PDF & auf Server speichern</button>
+        </div>
+      </div>
+      <div id="contractRenderLehrer" class="contract-preview">
+        <h2>Leihvertrag über die Leihe eines mobilen Endgeräts<br>für Lehrkräfte</h2>
+        <p style="text-align: center;"><strong>Zwischen</strong><br>der <strong>Kooperativen Gesamtschule Bad Münder (KGS Bad Münder)</strong><br>Bahnhofstraße 52, 31848 Bad Münder, vertreten durch die Schulleitung<br><em>- im Folgenden Verleiher -</em></p>
+        <p style="text-align: center;"><strong>und</strong><br><span class="contract-field" id="pl_lehrerName"></span>, <span class="contract-field" id="pl_lehrerAdresse"></span><br><em>- im Folgenden Entleiher -</em></p>
+        <p>wird folgender Vertrag geschlossen:</p>
+        <h3>§ 1 Vertragsgegenstand</h3>
+        <p>(1) Der Verleiher stellt dem Entleiher das im Folgenden näher bezeichnete mobile Endgerät (im Folgenden: Leihobjekt) unentgeltlich zur Verfügung:</p>
+        <ul style="list-style-type: none; padding-left: 0;">
+          <li>• Mobiles Endgerät / Typenbezeichnung: <span class="contract-field" id="pl_geraetTyp"></span></li>
+          <li>• Seriennummer: <span class="contract-field" id="pl_sn"></span></li>
+          <li>• Ggf. Verleihnummer des Verleihers: <span class="contract-field" id="pl_verleihNr"></span></li>
+          <li>• Zubehör: <span class="contract-field" id="pl_zubehoer"></span></li>
+          <li>• Bemerkungen: <span class="contract-field" id="pl_bemerkungen"></span></li>
+        </ul>
+        <p>Das Leihobjekt steht im Eigentum des Verleihers.<br>(2) An dem Leihobjekt dürfen durch den Entleiher keine irreversiblen technischen Veränderungen vorgenommen werden.<br>(3) Das Leihobjekt befindet sich in dem aus der Anlage „Vorschäden" (Anlage 1) ersichtlichen Zustand.</p>
+        
+        <h3>§ 2 Dauer und Beendigung des Leihvertrages</h3>
+        <p>(1) Die Leihzeit beginnt mit der Ausgabe des Leihobjekts durch den Verleiher am <span class="contract-field" id="pl_ausgabeDatum"></span>. Verlässt der Entleiher die Schule, endet der Leihvertrag.<br>
+        (2) Der/Die Entleihende verpflichtet sich, den Vertragsgegenstand spätestens zum vereinbarten Rückgabedatum in ordnungsgemäßem Zustand zurückzugeben. Als Rückgabedatum gilt das Ende des aktuellen Schuljahres, sofern nachfolgend kein abweichendes Datum individuell vereinbart wurde.<br>
+        <strong>Vereinbartes Rückgabedatum:</strong> <span class="contract-field" id="pl_leihEnde"></span><br>
+        (3) Die Schulleitung kann zudem bestimmen, dass die Leihzeit in den Fällen endet, bei denen die Zweckbestimmung der Nutzung für einen längeren Zeitraum nicht mehr gegeben ist (z. B. Elternzeit, Sabbatzeit, Langzeiterkrankung, Vollabordnungen).</p>
+        
+        <h3>§ 3 Zweckbestimmung der Nutzung des Leihobjekts</h3>
+        <p>(1) Das Leihobjekt wird dem Entleiher ausschließlich für dienstliche Zwecke zur Verfügung gestellt. Dazu zählen insbesondere die Vor-, Nachbereitung und Durchführung des Unterrichts in der Schule, zu Hause und an einem anderen Lernort sowie die Erteilung des digitalen Distanzunterrichts.<br>
+        (2) Eine privaten Zwecken dienende Nutzung des Leihobjekts ist nicht zulässig.</p>
+        <h3>§ 4 Geräteverwaltung</h3>
+        <p>(1) Apps und sonstige Software dürfen durch den Entleiher grundsätzlich nur nach Genehmigung durch den Verleiher installiert werden.<br>
+        (2) Der Verleiher behält sich vor, jederzeit zentral gesteuerte Updates vorzunehmen.<br>
+        (3) Das mobile Endgerät wird zentral mit Hilfe einer Software über eine Mobilgeräteverwaltung administriert.<br>
+        (4) Eine Haftung des Verleihers für gelöschte Daten ist ausgeschlossen.</p>
+        <h3>§ 5 bis § 7 Sicherung, Datenspeicherung & Aufbewahrung</h3>
+        <p><strong>§ 5 Sicherung & besondere Sicherheitsanforderungen:</strong> Einrichtung eines persönlichen Passworts. Virenscanner und Contentfilter können eingesetzt werden. Verdacht auf Schadsoftware ist unverzüglich zu melden.<br>
+        <strong>§ 6 Datenspeicherung:</strong> Speicherung soll soweit möglich auf schuleigenen Servern erfolgen.<br>
+        <strong>§ 7 Aufbewahrung:</strong> Das Leihobjekt ist pfleglich zu behandeln und sicher aufzubewahren.</p>
+        <h3>§ 8 bis § 13 Datenschutz, Versicherung & Sonstiges</h3>
+        <p><strong>§ 8 Datenschutz:</strong> Verarbeitung nach Art. 6 Abs. 1 Satz 1 Buchst. b) DSGVO.<br>
+        <strong>§ 9 Weitergabe:</strong> Eine Weitergabe an Dritte ist untersagt.<br>
+        <strong>§ 10 Haftung:</strong> Die Lehrkraft haftet für Schäden, die grob fahrlässig oder vorsätzlich verursacht wurden.<br>
+        <strong>§ 11 Versicherung:</strong> Eine Versicherung kann eigenverantwortlich abgeschlossen werden.<br>
+        <strong>§ 12 Kündigung:</strong> Fristlose Kündigung bei vertragswidrigem Gebrauch möglich.<br>
+        <strong>§ 13 Sonstiges:</strong> Nebenabreden bedürfen der Schriftform.</p>
+        <br><br>
+        <p>Bad Münder, den <span class="contract-field" id="pl_datumAktuell"></span></p>
+        <table style="width:100%; text-align: center; border:none;">
+          <tr style="border:none;">
+            <td style="width:50%; border:none;"><img id="pl_sigImageLehrer" class="signature-img" src="" alt=""><br>_________________________<br>Unterschrift Entleiher (Lehrkraft)</td>
+            <td style="width:50%; border:none;"><br><br>_________________________<br>Für den Verleiher: Schulleitung (mit Stempel)</td>
+          </tr>
+        </table>
+        <hr style="margin-top: 30px; border: 0; border-top: 1px solid #ccc;">
+        <h3>Anlage 1: Vorschäden</h3>
+        <p>Das unter § 1 Abs. 1 des Leihvertrages aufgelistete mobile Endgerät weist folgende Vorschäden auf:<br>
+        Seriennummer: <span class="contract-field" id="pl_snAnlage"></span> | Bemerkungen: <span class="contract-field" id="pl_bemerkungenAnlage"></span></p>
+        <hr style="margin-top: 20px; border: 0; border-top: 1px solid #ccc;">
+        <h3>Anlage 2: Datenschutzhinweise nach Art. 12, 13 und 14 DSGVO</h3>
+        <p>Die Rechtsgrundlage für die Verarbeitung der personenbezogenen Daten ist Art. 6 Abs. 1 Satz 1 Buchst. b) DSGVO.<br>
+        Ihre Rechte: Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17), Widerspruch (Art. 21), Beschwerde bei der Aufsichtsbehörde (LfD Niedersachsen) sowie Widerruf.<br>
+        Ich habe die Datenschutz-Aufklärung zur Verarbeitung personenbezogener Daten gemäß Artikel 13 DSGVO ausgehändigt bekommen.</p>
+        <br>
+        <p>Bad Münder, den <span class="contract-field" id="pl_datumAktuellDS"></span></p>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODALS -->
+  <div id="ticketModal" class="modal">
+    <div class="modal-content">
+      <h3 style="margin-top: 0; color: var(--primary);">Neue Schadensmeldung aufgeben</h3>
+      <form onsubmit="saveTicket(event)">
+         <div class="form-group search-container">
+           <label>Entliehenes Gerät suchen (Name oder S/N):</label>
+           <input type="text" id="ticketSearchInput" onkeyup="filterDevices()" autocomplete="off" placeholder="Tippe 'Max' oder 'DMP...'">
+           <div id="ticketSearchResults" class="search-results"></div>
+         </div>
+         <input type="hidden" id="ticketLoanId">
+         <div class="form-row">
+           <div class="form-group"><label>Entleiher:</label><input type="text" id="ticketName" readonly style="background:#edf2f7; color:#718096; border-color:#e2e8f0;"></div>
+           <div class="form-group"><label>S/N Gerät:</label><input type="text" id="ticketSn" readonly style="background:#edf2f7; color:#718096; border-color:#e2e8f0;"></div>
+         </div>
+         <div class="form-row">
+           <div class="form-group"><label>Datum:</label><input type="date" id="ticketDate" required></div>
+           <div class="form-group">
+             <label>Art des Schadens:</label>
+             <select id="ticketType" required>
+               <option value="Display / Glasbruch">Display / Glasbruch</option>
+               <option value="Akku defekt">Akku defekt</option>
+               <option value="Wasserschaden">Wasserschaden</option>
+               <option value="Software / MDM-Problem">Software / MDM-Problem</option>
+               <option value="Zubehör defekt/verloren">Zubehör defekt/verloren</option>
+               <option value="Diebstahl / Verlust">Diebstahl / Verlust</option>
+               <option value="Sonstiges">Sonstiges</option>
+             </select>
+           </div>
+         </div>
+         <div class="form-group">
+           <label>Beschreibung (Details zum Schaden):</label>
+           <textarea id="ticketDesc" rows="3" required></textarea>
+         </div>
+         <div class="form-group">
+           <label>Status der Meldung:</label>
+           <select id="ticketStatus">
+             <option value="🔴 Offen">🔴 Offen (Neu erfasst)</option>
+             <option value="🟡 In schulinterner Prüfung">🟡 In schulinterner Prüfung</option>
+             <option value="🟡 Eingeschickt an Dienstleister">🟡 Eingeschickt an Dienstleister</option>
+           </select>
+         </div>
+         <div style="display:flex; justify-content:space-between; margin-top:20px; border-top:1px solid var(--border); padding-top:15px;">
+           <button type="button" class="btn btn-secondary" onclick="closeModal('ticketModal')">Abbrechen</button>
+           <button type="submit" class="btn btn-success">Meldung speichern & Ticket anlegen</button>
+         </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="cloudModal" class="modal">
+    <div class="modal-content">
+      <h3 style="margin-top: 0; color: var(--primary);">Cloud-Speicherlösung wählen</h3>
+      <div class="cloud-provider-list">
+        <div class="cloud-provider-item" onclick="selectCloudProvider('Microsoft OneDrive / SharePoint', 'microsoft')" style="border-color: #bee3f8; background-color: #ebf8ff;">
+          <div><strong>Microsoft OneDrive / SharePoint</strong></div>
+          <button class="btn btn-info" style="font-size: 12px; padding: 4px 10px;">Auswählen</button>
+        </div>
+        <div class="cloud-provider-item" onclick="selectCloudProvider('IServ Wolke (Nextcloud)', 'iserv')" style="border-color: #c6f6d5; background-color: #f0fff4; margin-top: 10px;">
+          <div><strong>IServ Wolke (Nextcloud)</strong></div>
+          <button class="btn btn-success" style="font-size: 12px; padding: 4px 10px;">Auswählen</button>
+        </div>
+      </div>
+      <div style="text-align: right; margin-top: 15px;">
+        <button class="btn btn-secondary" onclick="closeModal('cloudModal')">Abbrechen</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="rulesModal" class="modal">
+    <div class="modal-content modal-content-large">
+      <div class="modal-body rules-text">
+        <h2>Nutzungsordnung für digitale Endgeräte (iPads)</h2>
+        <h3>1. Allgemeine Nutzung des Tablets</h3>
+        <ul>
+          <li>1.1 Die Tablets sind für schulische Zwecke bestimmt. Die Verwaltung erfolgt über das MDM der HaPy-Schul-IT.</li>
+          <li>1.2 Die Tablets, Hüllen und Stifte sind gut sichtbar mit dem Namen zu beschriften.</li>
+          <li>1.3 Das Tablet ist mit einem sicheren Passwort (Code) zu schützen.</li>
+          <li>1.4 Private Nutzung elternfinanzierter Tablets ist zulässig (eigene Apple-ID auf eigene Verantwortung).</li>
+          <li>1.5 Schulische Anwendungen werden größtenteils via MDM bereitgestellt.</li>
+          <li>1.6 Sicherheitsvorkehrungen dürfen weder verändert noch umgangen werden.</li>
+          <li>1.7 Bei Verdacht auf Schadsoftware ist die Systemadministration zu informieren; Nutzung ist bis zur Freigabe untersagt.</li>
+          <li>1.8 Beim Ausscheiden aus der Schule sind Daten extern zu sichern (schulische Lizenzen erlöschen).</li>
+          <li>1.9 Nutzung im Unterricht erfolgt ausschließlich auf Anweisung der Lehrkraft.</li>
+          <li>1.10 In den Pausen verbleiben die Tablets in Schultasche oder Schließfach.</li>
+          <li>1.11 Schul-WLAN und Bluetooth sind während des Schultages einzuschalten.</li>
+          <li>1.12 Mit fremden Geräten ist sorgsam umzugehen. Nutzung nur mit Einverständnis.</li>
+          <li>1.13 Keine Handlungen, die dem Ansehen der Schule schaden oder IT-Systeme beeinträchtigen.</li>
+          <li>1.14 Nur mit Erlaubnis der Lehrkraft: Spiele, Streaming, Downloads, Social Media/Chats, Apple-TV Verbindung.</li>
+          <li>1.15 Der Arbeitsgerät-Charakter muss erhalten bleiben. Der erste Homebildschirm ist für schulische Apps reserviert.</li>
+          <li>1.16 Ergänzende Regelungen im Fachunterricht durch Fachlehrkräfte möglich.</li>
+          <li>1.17 Werkzeuge wie Apple "Classroom" können eingesetzt werden (keine Einsicht in private Dateien). Eigenmächtiges Verlassen bei Prüfungen gilt als Täuschung.</li>
+        </ul>
+        <h3>2. Pflichten der Schülerinnen und Schüler</h3>
+        <ul>
+          <li>2.1 Tablets täglich mit ausreichend geladenem Akku mitbringen.</li>
+          <li>2.2 Ausreichend freier Speicherplatz für schulische Arbeit muss vorhanden sein.</li>
+          <li>2.3 Zugangsdaten geheim halten, regelmäßig erneuern. Nur unter eigenen Daten arbeiten.</li>
+          <li>2.4 Apps und Mitschriften strukturiert verwalten.</li>
+          <li>2.5 Eigenverantwortliche, regelmäßige Sicherung von Daten und Ergebnissen.</li>
+          <li>2.6 Einhaltung der "10 Gebote der digitalen Ethik".</li>
+        </ul>
+        <h3>3. Persönlichkeitsrechte, Urheberrecht und Datenschutz</h3>
+        <ul>
+          <li>3.1 Gesetzliche Bestimmungen (Recht am Bild/Wort) gelten.</li>
+          <li>3.2 Fotografieren, Filmen und Audioaufnahmen ohne Genehmigung sind untersagt.</li>
+          <li>3.3 Aufnahmen im Schulgebäude nur mit ausdrücklicher Erlaubnis für schulische Zwecke.</li>
+          <li>3.4 Verbot von rassistischen, pornografischen oder gewaltverherrlichenden Inhalten. Versehentliches Aufrufen sofort melden.</li>
+          <li>3.5 Urheberrecht beachten. Unbefugtes Herunterladen/Streamen von Musik oder Filmen ist verboten.</li>
+        </ul>
+        <h3>4. Digitale Kommunikation</h3>
+        <ul>
+          <li>4.1 Zentrale Plattform ist IServ.</li>
+          <li>4.2 Identitätstäuschung oder Nutzung fremder Konten ist untersagt.</li>
+          <li>4.3 Beleidigung, Mobbing und Bedrohung werden nicht geduldet.</li>
+          <li>4.4 Ablenkende Nachrichten sind zu vermeiden.</li>
+          <li>4.5 Formvorschriften bei E-Mails (Anrede, Gruß, Betreff) einhalten.</li>
+          <li>4.6 Dateianhänge unbekannter Absender dürfen nicht geöffnet werden.</li>
+        </ul>
+        <h3>5. Aufgaben der Lehrkräfte</h3>
+        <ul>
+          <li>5.1 Unterstützung beim Einüben der Nutzungsordnung.</li>
+          <li>5.2 Unterricht im reflektierten Umgang mit digitalen Geräten.</li>
+          <li>5.3 Achtung der Persönlichkeitsrechte (Aufnahmen nur für Unterrichtszwecke).</li>
+          <li>5.4 Kein Zugriff auf Arbeitsergebnisse der Schüler ohne deren Zustimmung.</li>
+        </ul>
+        <h3>6. Verstöße, Haftung und Schlussbestimmungen</h3>
+        <ul>
+          <li>6.1 Verstöße können Erziehungs- und Ordnungsmaßnahmen (nach § 61 NSchG) nach sich ziehen.</li>
+          <li>6.2 Pflicht zur Anzeige bei Straftatbeständen.</li>
+          <li>6.3 Die KGS Bad Münder übernimmt keine Haftung für Beschädigung/Verlust privater Geräte oder Daten.</li>
+          <li>6.4 Teilunwirksamkeit berührt die übrigen Bestimmungen nicht.</li>
+        </ul>
+      </div>
+      <div style="text-align: right; border-top: 1px solid var(--border); padding-top: 15px;">
+        <button class="btn btn-primary" onclick="closeModal('rulesModal')">Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="legalModalSchueler" class="modal">
+    <div class="modal-content modal-content-large">
+      <div class="modal-body rules-text">
+        <h2>Rechtliche Rahmenbedingungen (Schülerinnen und Schüler)</h2>
+        <h3>§ 1 Vertragsgegenstand</h3>
+        <p>(1) Der Verleiher stellt das mobile Endgerät und etwaiges Zubehör zur Verfügung.</p>
+        <p>(2) Keine irreversiblen technischen Veränderungen.</p>
+        <p>(3) Gerät befindet sich im protokollierten Zustand.</p>
+        <h3>§ 2 Leihdauer</h3>
+        <p>Die Leihzeit endet mit dem letzten Schultag des Schuljahres oder beim Verlassen der KGS Bad Münder. Das Gerät ist unverzüglich zurückzugeben.</p>
+        <h3>§ 3 Zweckbestimmung</h3>
+        <p>Das Gerät wird für schulische Zwecke zur Verfügung gestellt. Die Erziehungsberechtigten sind für die Einhaltung zuständig.</p>
+        <h3>§ 4 Geräteverwaltung</h3>
+        <p>Apps und Software werden ausschließlich durch den Administrator installiert. Zentrale Updates und MDM-Verwaltung (Sperren, Orten, Löschen) werden durchgeführt. Voraussetzung ist die Verarbeitung personenbezogener Daten.</p>
+        <h3>§ 5 Verhaltenspflichten</h3>
+        <p>Das Abrufen oder Verbreiten verfassungsfeindlicher, rassistischer, gewaltverherrlichender oder pornografischer Inhalte ist verboten. Sicherheitsvorkehrungen dürfen nicht umgangen werden. Datenübertragung nur aus sicheren Quellen.</p>
+        <h3>§ 6 bis § 10 Sicherung, Datenspeicherung & Aufbewahrung</h3>
+        <p>Datenspeicherung möglichst auf Schulservern (NBC). Eigenverantwortung für datenschutzrechtlich korrekte Nutzung. Sichere Aufbewahrung in der Schutzhülle. Das iPad ist mit einem 6-stelligen Code gesichert und hat Ortungsdienste aktiviert. Ein Contentfilter (Altersfreigabe 12 Jahre) ist vorgeschaltet.</p>
+        <h3>§ 11 bis § 14 Weitere Bestimmungen</h3>
+        <p>Haftung nach gesetzlichen Vorgaben; kein Anspruch auf Ersatz. Keine Weitergabe an Dritte. Verlust oder Diebstahl ist sofort der Schule (und bei Diebstahl der Polizei) zu melden. Zuwiderhandlungen können zum Entzug führen.</p>
+      </div>
+      <div style="text-align: right; border-top: 1px solid var(--border); padding-top: 15px;">
+        <button class="btn btn-primary" onclick="closeModal('legalModalSchueler')">Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="legalModalLehrer" class="modal">
+    <div class="modal-content modal-content-large">
+      <div class="modal-body rules-text">
+        <h2>Rechtliche Rahmenbedingungen (Lehrkräfte)</h2>
+        <h3>§ 1 Vertragsgegenstand</h3>
+        <p>(1) Der Verleiher stellt dem Entleiher das bezeichnete mobile Endgerät unentgeltlich zur Verfügung. Das Leihobjekt steht im Eigentum des Verleihers.</p>
+        <p>(2) An dem Leihobjekt dürfen keine irreversiblen technical Veränderungen vorgenommen werden.</p>
+        <p>(3) Das Leihobjekt befindet sich im aus der Anlage ersichtlichen Zustand.</p>
+        <h3>§ 2 Dauer und Beendigung</h3>
+        <p>(1) Verlässt der Entleiher die Schule, endet der Leihvertrag.</p>
+        <p>(2) Die Schulleitung kann zudem bestimmen, dass die Leihzeit endet, wenn die Zweckbestimmung der Nutzung für einen längeren Zeitraum nicht gegeben ist (z. B. Elternzeit, Sabbatzeit, Langzeiterkrankung, Vollabordnungen).</p>
+        <p>(3) Der Entleiher hat das Leihobjekt in ordnungsgemäßem Zustand zurückzugeben.</p>
+        <h3>§ 3 Zweckbestimmung</h3>
+        <p>(1) Ausschließliche Nutzung für dienstliche Zwecke (Vor-, Nachbereitung, Durchführung des Unterrichts, Distanzunterricht).</p>
+        <p>(2) Eine private Nutzung ist nicht zulässig.</p>
+        <h3>§ 4 Geräteverwaltung</h3>
+        <p>Apps dürfen nur nach Genehmigung installiert werden. Updates werden zentral gesteuert. Die Administration erfolgt über eine Mobilgeräteverwaltung. Haftung für gelöschte Daten ist ausgeschlossen.</p>
+        <h3>§ 5 bis § 7 Sicherung, Datenspeicherung & Aufbewahrung</h3>
+        <p>Sicherung: Persönliches Passwort ist einzurichten. Virenscanner und Contentfilter können eingesetzt werden.</p>
+        <p>Datenspeicherung: Auf schuleigenen Servern. Keine Nutzung für urheber- oder strafrechtlich verbotene Inhalte.</p>
+        <p>Aufbewahrung: Pflegliche Behandlung und sichere Aufbewahrung vor Dritten.</p>
+        <h3>§ 8 bis § 13 Weitere Bestimmungen</h3>
+        <p>Datenschutz nach DSGVO. Weitergabe an Dritte ist untersagt. Haftung bei grober Fahrlässigkeit oder Vorsatz. Eigenverantwortlicher Abschluss einer Versicherung ist möglich. Fristlose Kündigung bei vertragswidrigem Gebrauch. Nebenabreden bedürfen der Schriftform.</p>
+      </div>
+      <div style="text-align: right; border-top: 1px solid var(--border); padding-top: 15px;">
+        <button class="btn btn-primary" onclick="closeModal('legalModalLehrer')">Schließen</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  document.getElementById('ausgabeDatum').valueAsDate = new Date();
+  document.getElementById('lehrerAusgabeDatum').valueAsDate = new Date();
+
+  let loanDatabase = [];
+  let ticketDatabase = [];
+  let currentPendingRecord = null;
+  let selectedProviderName = "";
+  let selectedProviderKey = "";
+
+  function addLog(message) {
+    const logBox = document.getElementById('activityLog');
+    const time = new Date().toLocaleTimeString('de-DE');
+    const item = document.createElement('div');
+    item.className = 'log-item';
+    item.innerHTML = `<span>${message}</span> <span class="log-time">${time}</span>`;
+    logBox.prepend(item);
+  }
+
+  function toggleErfassungsArt(typ) {
+      const art = document.getElementById(typ + 'ErfassungsArt').value;
+      if(art === 'digital') {
+          document.getElementById(typ + 'DigitalSection').style.display = 'block';
+          document.getElementById(typ + 'AnalogSection').style.display = 'none';
+      } else {
+          document.getElementById(typ + 'DigitalSection').style.display = 'none';
+          document.getElementById(typ + 'AnalogSection').style.display = 'block';
+      }
+  }
+
+  function toggleRueckgabeDatum(typ) {
+      const art = document.getElementById(typ + 'RueckgabeArt').value;
+      const dateField = document.getElementById(typ + 'RueckgabeDatum');
+      if(art === 'Individuell') {
+          dateField.style.display = 'block';
+      } else {
+          dateField.style.display = 'none';
+      }
+  }
+
+  async function loadLoansFromBackend() {
+    try {
+      const response = await fetch('http://localhost:3000/api/loans');
+      const data = await response.json();
+      loanDatabase = data;
+      renderLoansTable();
+    } catch (error) {
+      addLog("[Fehler]: Konnte keine Verbindung zum Server herstellen.");
+    }
+  }
+
+  async function loadTicketsFromBackend() {
+    try {
+      const response = await fetch('http://localhost:3000/api/tickets');
+      if (response.ok) {
+        ticketDatabase = await response.json();
+      }
+    } catch (error) {}
+    renderTickets();
+  }
+
+  async function deleteLoan(id) {
+    if(!confirm("Möchten Sie diesen Datensatz wirklich unwiderruflich löschen?")) return;
+    try {
+      const response = await fetch(`http://localhost:3000/api/loans/${id}`, { method: 'DELETE' });
+      const result = await response.json();
+      if(result.success) {
+        addLog(`[System]: Datensatz #${id} wurde gelöscht.`);
+        loadLoansFromBackend();
+      } else { alert("Fehler beim Löschen: " + result.message); }
+    } catch(err) { alert("Fehler: Server nicht erreichbar."); }
+  }
+
+  function renderLoansTable() {
+    const tbody = document.getElementById('loansTableBody');
+    tbody.innerHTML = '';
+    let schuelerCount = 0; let lehrerCount = 0;
+
+    loanDatabase.forEach(item => {
+      if (item.typ === 'Schüler') schuelerCount++;
+      if (item.typ === 'Lehrkraft') lehrerCount++;
+
+      let ticketBadge = '';
+      if (item.tickets && item.tickets.length > 0) {
+        const openTickets = item.tickets.filter(t => !t.status.includes('Gelöst')).length;
+        if (openTickets > 0) {
+          ticketBadge = `<span class="badge badge-danger" style="margin-left: 8px;" title="${openTickets} offene Schadensmeldung(en)">🛠️ ${openTickets} Offen</span>`;
+        } else {
+          ticketBadge = `<span class="badge badge-success" style="margin-left: 8px; background: #e2e8f0; color: #4a5568;" title="Historie: ${item.tickets.length} behobene(r) Schaden">🛠️ Repariert</span>`;
+        }
+      }
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>${item.typ}</strong></td>
+        <td>${item.name}</td>
+        <td>${item.klasse}</td>
+        <td>${item.verleihNr}</td>
+        <td>${item.sn} ${ticketBadge}</td>
+        <td>${item.datum}</td>
+        <td><span class="badge badge-success">${item.status || 'Aktiv'}</span></td>
+        <td style="display: flex; gap: 5px;">
+          <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="viewContractFromDB(${item.id})">Anzeigen</button>
+          <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="deleteLoan(${item.id})">Löschen</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('statSchueler').innerText = schuelerCount;
+    document.getElementById('statLehrer').innerText = lehrerCount;
+    document.getElementById('statGeraete').innerText = schuelerCount + lehrerCount;
+  }
+
+  // --- NEU: Excel Backup in die Cloud ---
+  async function exportToExcel() {
+    addLog(`[Excel DB]: Exportiere Datenbank als .xlsx Datei...`);
+    const excelData = loanDatabase.map(item => {
+      let schadensHistorie = "Keine Schäden gemeldet";
+      if (item.tickets && item.tickets.length > 0) {
+        schadensHistorie = item.tickets.map(t => `[${t.date}] ${t.type} (${t.status})`).join(" | ");
+      }
+      return {
+        "ID": item.id,
+        "Rolle": item.typ,
+        "Name": item.name,
+        "Klasse / Kürzel": item.klasse,
+        "Anschrift": item.adresse,
+        "Erziehungsberechtigte(r)": item.eltern,
+        "Verleihnummer": item.verleihNr,
+        "Seriennummer Gerät": item.sn,
+        "Zubehör": item.zubehoer,
+        "Ausgabedatum": item.datum,
+        "Status": item.status,
+        "Schadenshistorie (Tickets)": schadensHistorie,
+        "Digital Signiert": item.status.includes('Analog') ? "Nein (Upload Original)" : "Ja (Verifiziert)"
+      };
+    });
+    
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Ausleihen & Support");
+    
+    // Lokaler Download
+    XLSX.writeFile(workbook, "Leihvertraege_KGS_Bad_Muender_Datenbank.xlsx");
+    addLog(`[Excel DB]: Download der Excel-Datenbank abgeschlossen.`);
+
+    // Cloud Upload falls konfiguriert
+    if (selectedProviderKey) {
+        const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+        try {
+            addLog(`[Cloud-Backup]: Sende Excel an ${selectedProviderName}...`);
+            await fetch('http://localhost:3000/api/backup-excel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ excelBase64: wbout, provider: selectedProviderKey })
+            });
+            addLog(`[Cloud-Backup]: Excel erfolgreich hochgeladen.`);
+        } catch (error) {
+            addLog(`[Cloud-Backup]: Fehler beim Hochladen der Excel-Datei.`);
+        }
+    }
+  }
+
+  function renderTickets() {
+    const tbody = document.getElementById('ticketsTableBody');
+    const ticker = document.getElementById('ticketTicker');
+    tbody.innerHTML = '';
+    ticker.innerHTML = '';
+
+    if (ticketDatabase.length === 0) {
+      ticker.innerHTML = '<span style="color:#718096; font-size:13px;">Aktuell liegen keine Schadensmeldungen vor.</span>';
+    }
+
+    ticketDatabase.forEach(t => {
+      const tr = document.createElement('tr');
+      let badgeClass = 'badge-warning';
+      if(t.status.includes('Offen')) badgeClass = 'badge-danger';
+      if(t.status.includes('Gelöst')) badgeClass = 'badge-success';
+
+      tr.innerHTML = `
+        <td><strong>#${t.id}</strong></td>
+        <td>${t.date}</td>
+        <td>${t.name}</td>
+        <td>${t.sn}</td>
+        <td>${t.type}</td>
+        <td><span class="badge ${badgeClass}">${t.status}</span></td>
+        <td style="display:flex; gap:5px;">
+          ${!t.status.includes('Gelöst') ? `<button class="btn btn-success" style="padding: 2px 6px; font-size:11px;" onclick="resolveTicket(${t.id})">✔ Gelöst</button>` : ''}
+          <button class="btn btn-danger" style="padding: 2px 6px; font-size:11px;" onclick="deleteTicket(${t.id})">✖</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+
+      const item = document.createElement('div');
+      item.className = 'log-item';
+      let dot = '🔴';
+      if(t.status.includes('Prüfung') || t.status.includes('Eingeschickt')) dot = '🟡';
+      if(t.status.includes('Gelöst')) dot = '🟢';
+      
+      item.innerHTML = `<span>${dot} <strong>${t.status}:</strong> ${t.type} – iPad (${t.sn}) – <em>${t.name}</em></span> <span class="log-time">[${t.date}]</span>`;
+      ticker.appendChild(item);
+    });
+  }
+
+  function openTicketModal() {
+    document.getElementById('ticketSearchInput').value = '';
+    document.getElementById('ticketLoanId').value = '';
+    document.getElementById('ticketName').value = '';
+    document.getElementById('ticketSn').value = '';
+    document.getElementById('ticketDesc').value = '';
+    document.getElementById('ticketDate').valueAsDate = new Date();
+    document.getElementById('ticketSearchResults').style.display = 'none';
+    openModal('ticketModal');
+  }
+
+  function filterDevices() {
+    const query = document.getElementById('ticketSearchInput').value.toLowerCase();
+    const resultsBox = document.getElementById('ticketSearchResults');
+    resultsBox.innerHTML = '';
+    if(query.length < 2) { resultsBox.style.display = 'none'; return; }
+    const hits = loanDatabase.filter(l => l.name.toLowerCase().includes(query) || l.sn.toLowerCase().includes(query) || l.klasse.toLowerCase().includes(query));
+    if(hits.length === 0) {
+      resultsBox.innerHTML = '<div class="search-item" style="color:#718096;">Kein passendes Gerät gefunden.</div>';
+    } else {
+      hits.forEach(h => {
+        const div = document.createElement('div');
+        div.className = 'search-item';
+        div.innerHTML = `<strong>${h.name}</strong> (${h.klasse}) – S/N: ${h.sn}`;
+        div.onclick = () => selectDeviceForTicket(h);
+        resultsBox.appendChild(div);
+      });
+    }
+    resultsBox.style.display = 'block';
+  }
+
+  function selectDeviceForTicket(device) {
+    document.getElementById('ticketSearchInput').value = `${device.name} - ${device.sn}`;
+    document.getElementById('ticketLoanId').value = device.id;
+    document.getElementById('ticketName').value = `${device.name} (${device.typ})`;
+    document.getElementById('ticketSn').value = device.sn;
+    document.getElementById('ticketSearchResults').style.display = 'none';
+  }
+
+  async function saveTicket(e) {
+    e.preventDefault();
+    const loanId = document.getElementById('ticketLoanId').value;
+    if(!loanId) { alert("Bitte wähle zuerst über die Suche ein entliehenes Gerät aus."); return; }
+    
+    const ticket = {
+      loanId: loanId,
+      name: document.getElementById('ticketName').value,
+      sn: document.getElementById('ticketSn').value,
+      date: formatDate(document.getElementById('ticketDate').value),
+      type: document.getElementById('ticketType').value,
+      desc: document.getElementById('ticketDesc').value,
+      status: document.getElementById('ticketStatus').value
+    };
+
+    try {
+      const response = await fetch('http://localhost:3000/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ticket)
+      });
+      const res = await response.json();
+      if(res.success) {
+        closeModal('ticketModal');
+        loadTicketsFromBackend();
+        loadLoansFromBackend();
+      } else { alert("Fehler: " + res.message); }
+    } catch(err) {
+      ticket.id = ticketDatabase.length ? ticketDatabase[0].id + 1 : 1001;
+      ticketDatabase.unshift(ticket);
+      renderTickets();
+      closeModal('ticketModal');
+    }
+  }
+
+  async function resolveTicket(id) {
+    if(!confirm("Ticket als 'Gelöst' markieren?")) return;
+    try {
+      const response = await fetch(`http://localhost:3000/api/tickets/${id}/resolve`, { method: 'PUT' });
+      if(response.ok) { loadTicketsFromBackend(); loadLoansFromBackend(); }
+    } catch(err) {
+      const t = ticketDatabase.find(x => x.id === id);
+      if(t) t.status = "🟢 Gelöst";
+      renderTickets();
+    }
+  }
+
+  async function deleteTicket(id) {
+    if(!confirm("Dieses Support-Ticket unwiderruflich löschen?")) return;
+    try {
+      const response = await fetch(`http://localhost:3000/api/tickets/${id}`, { method: 'DELETE' });
+      if(response.ok) { loadTicketsFromBackend(); loadLoansFromBackend(); }
+    } catch(err) {
+      ticketDatabase = ticketDatabase.filter(x => x.id !== id);
+      renderTickets();
+    }
+  }
+
+  function showPage(pageId) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(pageId).classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function setupCanvas(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+    function startDrawing(e) { isDrawing = true; const pos = getPos(e); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); }
+    function draw(e) { if (!isDrawing) return; const pos = getPos(e); ctx.lineTo(pos.x, pos.y); ctx.strokeStyle = "#000080"; ctx.lineWidth = 2; ctx.stroke(); }
+    function stopDrawing() { isDrawing = false; }
+    canvas.addEventListener('mousedown', startDrawing); canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('touchstart', (e) => { startDrawing(e); e.preventDefault(); }); canvas.addEventListener('touchmove', (e) => { draw(e); e.preventDefault(); }); canvas.addEventListener('touchend', stopDrawing);
+    return { canvas, ctx };
+  }
+
+  const { canvas: canvasSchueler, ctx: ctxSchueler } = setupCanvas('sigCanvasSchueler');
+  const { canvas: canvasLehrer, ctx: ctxLehrer } = setupCanvas('sigCanvasLehrer');
+  function clearCanvas(ctx, canvas) { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+  function formatDate(dateStr) { if (!dateStr) return ''; const parts = dateStr.split('-'); return `${parts[2]}.${parts[1]}.${parts[0]}`; }
+
+  async function saveAnalogContract(typ) {
+      const prefix = typ === 'schueler' ? 'schueler' : 'lehrer';
+      const adminCheck = document.getElementById(prefix + 'AdminCheck').checked;
+      
+      if (!adminCheck) { alert("Bitte bestätige als Admin die Korrektheit (Häkchen setzen)."); return; }
+
+      const fileInput = document.getElementById(prefix + 'UploadFile');
+      if (!fileInput.files.length) { alert("Bitte lade eine PDF-Datei des unterschriebenen Vertrags hoch."); return; }
+
+      const name = document.getElementById(prefix + 'Name').value;
+      const sn = document.getElementById(prefix === 'schueler' ? 'snIpad' : 'lehrerSN').value;
+      const klasse = document.getElementById(prefix === 'schueler' ? 'klasse' : 'lehrerKuerzel').value || '-';
+      const vnr = document.getElementById(prefix === 'schueler' ? 'verleihNr' : 'lehrerVerleihNr').value || '-';
+
+      if (!name || !sn) { alert("Name und Seriennummer müssen für die Datenbank ausgefüllt sein."); return; }
+
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+      
+      reader.onload = async function(e) {
+          const pdfBase64 = e.target.result;
+
+          const record = {
+              typ: typ === 'schueler' ? "Schüler" : "Lehrkraft",
+              name: name,
+              klasse: klasse,
+              adresse: "Vertrag manuell hinterlegt",
+              eltern: typ === 'schueler' ? "Vertrag manuell hinterlegt" : "-",
+              verleihNr: vnr,
+              sn: sn,
+              zubehoer: "Im Original hinterlegt",
+              datum: formatDate(new Date().toISOString().split('T')[0]),
+              status: "Aktiv (Analog)"
+          };
+
+          try {
+            addLog(`[System]: Sende eingescannten Vertrag an Server...`);
+            const response = await fetch('http://localhost:3000/api/loans', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ record: record, pdfBase64: pdfBase64, cloudConfig: { provider: selectedProviderKey } })
+            });
+            const result = await response.json();
+            if(result.success) {
+                alert("Analoger Vertrag erfolgreich in der Datenbank und Cloud gespeichert!");
+                loadLoansFromBackend();
+                showPage('dashboardPage');
+            } else { alert("Fehler vom Server: " + result.message); }
+          } catch (error) { alert("Es konnte keine Verbindung zum Backend hergestellt werden."); }
+      };
+      reader.readAsDataURL(file);
+  }
+
+  function buildAndShowPreviewSchueler() {
+    const nutzungsordnungCheck = document.getElementById('schuelerNutzungsordnung').checked;
+    if(!nutzungsordnungCheck) { alert("Bitte bestätigen Sie die Kenntnisnahme der Nutzungsordnung (Häkchen setzen)."); return; }
+    const rechtlichesCheck = document.getElementById('schuelerRechtliches').checked;
+    if(!rechtlichesCheck) { alert("Bitte bestätigen Sie die Kenntnisnahme der rechtlichen Rahmenbedingungen (Häkchen setzen)."); return; }
+    const name = document.getElementById('schuelerName').value;
+    if (!name) { alert('Bitte Namen eingeben.'); return; }
+    
+    document.getElementById('p_schuelerName').innerText = name;
+    document.getElementById('p_klasse').innerText = document.getElementById('klasse').value;
+    document.getElementById('p_adresse').innerText = document.getElementById('adresse').value;
+    document.getElementById('p_elternName').innerText = document.getElementById('elternName').value;
+    document.getElementById('p_verleihNr').innerText = document.getElementById('verleihNr').value;
+    document.getElementById('p_snIpad').innerText = document.getElementById('snIpad').value;
+    document.getElementById('p_snTastatur').innerText = document.getElementById('snTastatur').value || '—';
+    
+    const snAnlage = document.getElementById('p_snIpadAnlage');
+    if (snAnlage) snAnlage.innerText = document.getElementById('snIpad').value;
+
+    let zub = [];
+    if (document.getElementById('zubLadekabel').checked) zub.push('Ladegerät + Kabel');
+    if (document.getElementById('zubTastatur').checked) zub.push('Tastatur');
+    if (document.getElementById('zubStift').checked) zub.push('Eingabestift');
+    document.getElementById('p_zubehoer').innerText = zub.join(', ');
+
+    document.getElementById('p_ausgabeDatum').innerText = formatDate(document.getElementById('ausgabeDatum').value);
+    
+    const rueckArt = document.getElementById('schuelerRueckgabeArt').value;
+    let rueckgabeText = "Ende des aktuellen Schuljahres";
+    if(rueckArt === 'Individuell') rueckgabeText = formatDate(document.getElementById('schuelerRueckgabeDatum').value);
+    document.getElementById('p_leihEnde').innerText = rueckgabeText;
+
+    document.getElementById('p_datumAktuell').innerText = formatDate(document.getElementById('ausgabeDatum').value);
+    document.getElementById('p_sigImageSchueler').src = canvasSchueler.toDataURL();
+
+    currentPendingRecord = {
+      typ: "Schüler", name: name, klasse: document.getElementById('klasse').value,
+      adresse: document.getElementById('adresse').value, eltern: document.getElementById('elternName').value,
+      verleihNr: document.getElementById('verleihNr').value, sn: document.getElementById('snIpad').value,
+      zubehoer: zub.join(', '),
+      datum: formatDate(document.getElementById('ausgabeDatum').value)
+    };
+    showPage('previewPageSchueler');
+  }
+
+  function buildAndShowPreviewLehrer() {
+    const nutzungsordnungCheck = document.getElementById('lehrerNutzungsordnung').checked;
+    if(!nutzungsordnungCheck) { alert("Bitte bestätigen Sie die Kenntnisnahme der Nutzungsbedingungen (Häkchen setzen)."); return; }
+    const rechtlichesCheck = document.getElementById('lehrerRechtliches').checked;
+    if(!rechtlichesCheck) { alert("Bitte bestätigen Sie die Kenntnisnahme der rechtlichen Rahmenbedingungen (Häkchen setzen)."); return; }
+    const name = document.getElementById('lehrerName').value;
+    if (!name) { alert('Bitte Namen eingeben.'); return; }
+
+    document.getElementById('pl_lehrerName').innerText = name;
+    document.getElementById('pl_lehrerAdresse').innerText = document.getElementById('lehrerAdresse').value;
+    document.getElementById('pl_geraetTyp').innerText = document.getElementById('lehrerGeraetTyp').value;
+    document.getElementById('pl_sn').innerText = document.getElementById('lehrerSN').value;
+    document.getElementById('pl_snAnlage').innerText = document.getElementById('lehrerSN').value;
+    document.getElementById('pl_verleihNr').innerText = document.getElementById('lehrerVerleihNr').value || '-';
+    document.getElementById('pl_zubehoer').innerText = document.getElementById('lehrerZubehoer').value;
+    document.getElementById('pl_bemerkungen').innerText = document.getElementById('lehrerBemerkungen').value;
+    document.getElementById('pl_bemerkungenAnlage').innerText = document.getElementById('lehrerBemerkungen').value;
+
+    const datum = formatDate(document.getElementById('lehrerAusgabeDatum').value);
+    document.getElementById('pl_ausgabeDatum').innerText = datum;
+    document.getElementById('pl_datumAktuell').innerText = datum;
+    document.getElementById('pl_datumAktuellDS').innerText = datum;
+    
+    const rueckArt = document.getElementById('lehrerRueckgabeArt').value;
+    let rueckgabeText = "Ende des aktuellen Schuljahres";
+    if(rueckArt === 'Individuell') rueckgabeText = formatDate(document.getElementById('lehrerRueckgabeDatum').value);
+    document.getElementById('pl_leihEnde').innerText = rueckgabeText;
+
+    document.getElementById('pl_sigImageLehrer').src = canvasLehrer.toDataURL();
+
+    currentPendingRecord = {
+      typ: "Lehrkraft", name: name, klasse: document.getElementById('lehrerKuerzel').value || '—',
+      adresse: document.getElementById('lehrerAdresse').value, eltern: "—",
+      verleihNr: document.getElementById('lehrerVerleihNr').value || '-', sn: document.getElementById('lehrerSN').value,
+      zubehoer: document.getElementById('lehrerZubehoer').value,
+      datum: datum
+    };
+    showPage('previewPageLehrer');
+  }
+
+  async function saveContract(typ) {
+    const elementId = typ === 'schueler' ? 'contractRenderSchueler' : 'contractRenderLehrer';
+    const element = document.getElementById(elementId);
+    const opt = { margin: 10, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
+    
+    try {
+      addLog(`[System]: Sende Daten und PDF an den Server...`);
+      const pdfBase64 = await html2pdf().set(opt).from(element).output('datauristring');
+      
+      const response = await fetch('http://localhost:3000/api/loans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          record: currentPendingRecord,
+          pdfBase64: pdfBase64,
+          cloudConfig: { provider: selectedProviderKey }
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        addLog(`[Server]: Datensatz gespeichert.`);
+        alert("Erfolgreich auf dem Server gespeichert!");
+        loadLoansFromBackend();
+        showPage('dashboardPage');
+      } else { alert("Fehler vom Server: " + result.message); }
+    } catch (error) { alert("Es konnte keine Verbindung zum Backend hergestellt werden. Läuft der Server?"); }
+  }
+
+  function selectCloudProvider(name, key) {
+    selectedProviderName = name; 
+    selectedProviderKey = key;
+    document.getElementById('cloudStatusText').innerText = `Aktiv: ${selectedProviderName}`;
+    document.getElementById('cloudStatusText').className = "badge badge-success";
+    addLog(`[Cloud-Verbindung]: Provider gewechselt zu ${selectedProviderName}.`);
+    closeModal('cloudModal');
+  }
+
+  function openModal(modalId) { document.getElementById(modalId).classList.add('active'); }
+  function closeModal(modalId) { document.getElementById(modalId).classList.remove('active'); }
+
+  function viewContractFromDB(id) {
+    const item = loanDatabase.find(x => x.id === id);
+    if (!item) return;
+
+    if(item.status && item.status.includes('Analog')) {
+       alert("Dieser Vertrag wurde als PDF hochgeladen. Das Originaldokument befindet sich auf deinem Server / in der Cloud. Eine digitale Voransicht ist hier nicht möglich.");
+       return;
+    }
+
+    if (item.typ === 'Schüler') {
+      document.getElementById('schuelerErfassungsArt').value = 'digital';
+      toggleErfassungsArt('schueler');
+      document.getElementById('schuelerNutzungsordnung').checked = true;
+      document.getElementById('schuelerRechtliches').checked = true;
+      document.getElementById('schuelerName').value = item.name;
+      document.getElementById('klasse').value = item.klasse;
+      document.getElementById('adresse').value = item.adresse;
+      document.getElementById('elternName').value = item.eltern;
+      document.getElementById('verleihNr').value = item.verleihNr;
+      document.getElementById('snIpad').value = item.sn;
+      buildAndShowPreviewSchueler();
+    } else {
+      document.getElementById('lehrerErfassungsArt').value = 'digital';
+      toggleErfassungsArt('lehrer');
+      document.getElementById('lehrerNutzungsordnung').checked = true;
+      document.getElementById('lehrerRechtliches').checked = true;
+      document.getElementById('lehrerName').value = item.name;
+      document.getElementById('lehrerKuerzel').value = item.klasse;
+      document.getElementById('lehrerAdresse').value = item.adresse;
+      document.getElementById('lehrerSN').value = item.sn;
+      document.getElementById('lehrerVerleihNr').value = item.verleihNr;
+      document.getElementById('lehrerZubehoer').value = item.zubehoer;
+      buildAndShowPreviewLehrer();
+    }
+  }
+
+  window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+      event.target.classList.remove('active');
+    }
+  }
+
+  addLog("[System]: Anwendung gestartet. Lade Datenbank...");
+  loadLoansFromBackend();
+  loadTicketsFromBackend();
+</script>
+</body>
+</html>
