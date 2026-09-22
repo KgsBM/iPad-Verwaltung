@@ -628,6 +628,33 @@ function bindGlobalModalEvents() {
 /* =========================================================
    HELPERS
    ========================================================= */
+async function apiFetch(url, options) {
+  let res;
+  try {
+    res = await fetch(url, options);
+  } catch (networkErr) {
+    throw new Error('Server nicht erreichbar (Netzwerkfehler). Läuft der Server (node server.js)? ' + networkErr.message);
+  }
+
+  const contentType = res.headers.get('content-type') || '';
+  const isJson = contentType.includes('application/json');
+  const body = isJson ? await res.json().catch(() => null) : await res.text().catch(() => '');
+
+  if (!res.ok) {
+    if (isJson && body && body.error) throw new Error(body.error);
+    let hint = '';
+    if (res.status === 413) hint = ' Die Anfrage ist vermutlich zu groß für einen vorgeschalteten Server/Proxy (z.B. nginx "client_max_body_size" oder ein Upload-Limit des Hosting-Anbieters) und kam nie bei Node.js an.';
+    else if (res.status === 404) hint = ' Route wurde nicht gefunden – prüfe, ob der aktuelle server.js-Stand läuft.';
+    else if (res.status >= 500) hint = ' Der Server hat vermutlich einen Fehler geworfen – prüfe das Server-Log (Konsole von "node server.js").';
+    const snippet = typeof body === 'string' ? body.replace(/\s+/g, ' ').trim().slice(0, 160) : '';
+    throw new Error(`Server antwortete mit HTTP ${res.status}${res.statusText ? ' ' + res.statusText : ''} statt der erwarteten Antwort.${hint}${snippet ? ' Antwortanfang: "' + snippet + '"' : ''}`);
+  }
+
+  if (!isJson) {
+    throw new Error('Server antwortete mit unerwartetem Format (kein JSON) trotz Erfolgsstatus.');
+  }
+  return body;
+}
 function escapeHtml(str) {
   if (str === null || str === undefined) return '';
   return String(str)
@@ -693,16 +720,15 @@ function switchTab(tab) {
    ========================================================= */
 async function refreshData() {
   try {
-    const [loansRes, ticketsRes] = await Promise.all([fetch('/api/loans'), fetch('/api/tickets')]);
-    if (!loansRes.ok || !ticketsRes.ok) throw new Error('Server antwortete mit Fehler.');
-    state.loans = await loansRes.json();
-    state.tickets = await ticketsRes.json();
+    const [loans, tickets] = await Promise.all([apiFetch('/api/loans'), apiFetch('/api/tickets')]);
+    state.loans = loans;
+    state.tickets = tickets;
     renderLoansTable();
     renderTicketsTable();
     renderTicker();
     renderStats();
   } catch (err) {
-    showToast('Backend nicht erreichbar. Läuft der Server (node server.js)?', 'error');
+    showToast('Daten konnten nicht geladen werden: ' + err.message, 'error');
   }
 }
 function renderStats() {
@@ -764,8 +790,7 @@ function renderLoansTable() {
 async function deleteLoan(id) {
   if (!confirm('Ausleihe wirklich löschen? Das lokal gespeicherte PDF wird ebenfalls entfernt.')) return;
   try {
-    const res = await fetch('/api/loans/' + id, { method: 'DELETE' });
-    if (!res.ok) throw new Error((await res.json()).error || 'Serverfehler');
+    await apiFetch('/api/loans/' + id, { method: 'DELETE' });
     await refreshData();
     showToast('Ausleihe gelöscht.', 'success');
   } catch (err) { showToast('Fehler: ' + err.message, 'error'); }
@@ -1416,9 +1441,9 @@ async function submitLoan() {
       const el = document.getElementById('preview-content');
       const worker = html2pdf().set({
         margin: 10, filename: 'vertrag.pdf',
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        image: { type: 'jpeg', quality: 0.92 },
+        html2canvas: { scale: 1.5, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true }
       }).from(el);
       const dataUri = await worker.outputPdf('datauristring');
       pdfBase64 = dataUri.split('base64,')[1] || '';
@@ -1426,14 +1451,17 @@ async function submitLoan() {
       pdfBase64 = (formState.scanBase64 || '').split('base64,')[1] || '';
     }
 
+    const approxMB = (pdfBase64.length * 0.75) / (1024 * 1024);
+    if (approxMB > 8) {
+      showToast(`Hinweis: Das erzeugte PDF ist recht groß (~${approxMB.toFixed(1)} MB). Falls das Speichern gleich fehlschlägt, liegt es vermutlich an einem Upload-Limit eines vorgeschalteten Servers/Proxys.`, 'warning');
+    }
+
     const payload = { ...pendingData, typ: type, modus: mode, cloudProvider: state.cloudProvider, pdfBase64 };
     if (type === 'schueler') {
       payload.elternVerifiziert = mode === 'digital' ? !!formState.elternVerifiziert : !!pendingData.adminBestaetigt;
     }
 
-    const res = await fetch('/api/loans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (!res.ok) throw new Error((await res.json()).error || 'Serverfehler');
-    const saved = await res.json();
+    const saved = await apiFetch('/api/loans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 
     if (saved.cloudError) showToast('Hinweis: Cloud-Upload fehlgeschlagen (' + saved.cloudError + '). Lokal wurde gespeichert.', 'warning');
     else showToast('Ausleihe erfolgreich gespeichert.', 'success');
@@ -1478,11 +1506,10 @@ async function exportExcel() {
     XLSX.writeFile(wb, filename);
 
     const excelBase64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
-    const res = await fetch('/api/backup-excel', {
+    await apiFetch('/api/backup-excel', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ excelBase64, cloudProvider: state.cloudProvider, filename })
     });
-    if (!res.ok) throw new Error((await res.json()).error || 'Serverfehler');
     showToast('Excel-Export erstellt und in der Cloud gesichert.', 'success');
   } catch (err) {
     showToast('Export lokal erstellt, Cloud-Backup fehlgeschlagen: ' + err.message, 'warning');
@@ -1663,11 +1690,10 @@ async function submitTicket() {
   const beschreibung = document.getElementById('ticket-description').value.trim();
   if (!beschreibung) { showToast('Bitte eine Beschreibung angeben.', 'warning'); return; }
   try {
-    const res = await fetch('/api/tickets', {
+    await apiFetch('/api/tickets', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ geraeteSN: state.ticketSelection.geraeteSN, name: state.ticketSelection.name, beschreibung })
     });
-    if (!res.ok) throw new Error((await res.json()).error || 'Serverfehler');
     closeModal('ticket-modal');
     await refreshData();
     showToast('Ticket wurde angelegt.', 'success');
@@ -1681,10 +1707,9 @@ function openResolveModal(ticketId) {
 async function submitResolve() {
   const text = document.getElementById('resolve-text').value.trim();
   try {
-    const res = await fetch('/api/tickets/' + state.resolveTicketId + '/resolve', {
+    await apiFetch('/api/tickets/' + state.resolveTicketId + '/resolve', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ loesungsText: text })
     });
-    if (!res.ok) throw new Error((await res.json()).error || 'Serverfehler');
     closeModal('resolve-modal');
     await refreshData();
     showToast('Ticket als gelöst markiert.', 'success');
@@ -1693,8 +1718,7 @@ async function submitResolve() {
 async function deleteTicket(id) {
   if (!confirm('Ticket wirklich löschen?')) return;
   try {
-    const res = await fetch('/api/tickets/' + id, { method: 'DELETE' });
-    if (!res.ok) throw new Error((await res.json()).error || 'Serverfehler');
+    await apiFetch('/api/tickets/' + id, { method: 'DELETE' });
     await refreshData();
     showToast('Ticket gelöscht.', 'success');
   } catch (err) { showToast('Fehler: ' + err.message, 'error'); }
